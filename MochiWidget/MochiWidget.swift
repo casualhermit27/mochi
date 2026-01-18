@@ -99,7 +99,7 @@ struct MochiWidgetEntryView : View {
                 .padding(.bottom, 12)
                 
                 // Main Amount (Center)
-                Text("\(currencySymbol)\(formatAmount(todayTotal))")
+                Text("\(currencySymbol) \(formatAmount(todayTotal))")
                     .font(.system(size: 44, weight: .bold, design: .monospaced))
                     .foregroundColor(theme.text)
                     .minimumScaleFactor(0.5)
@@ -117,27 +117,30 @@ struct MochiWidgetEntryView : View {
                     HStack(spacing: 4) {
                         // Last Transaction
                         if lastTransaction > 0 {
-                            HStack(spacing: 4) {
-                                Text(lastTransactionNote.isEmpty ? "LAST" : lastTransactionNote.uppercased())
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(theme.text.opacity(0.5))
-                                    .lineLimit(1)
-                                
-                                Text("+ \(currencySymbol)\(formatAmount(lastTransaction))")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(theme.text.opacity(0.8))
-                            }
+                            Text(lastTransactionNote.isEmpty ? "LAST" : lastTransactionNote.uppercased())
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(theme.text.opacity(0.5))
+                                .lineLimit(1)
+                            
+                            Spacer()
+                            
+                            Text("+ \(currencySymbol)\(formatAmount(lastTransaction))")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(theme.text)
+
                         } else {
                             Text("NO SPEND")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundColor(theme.text.opacity(0.5))
+                            
+                            Spacer()
                         }
-                        
-                        Spacer()
                     }
                 }
             }
-            .padding(16)
+            .padding(.top, 16)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
         .containerBackground(for: .widget) {
             theme.background
