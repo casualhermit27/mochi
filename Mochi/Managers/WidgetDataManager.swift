@@ -29,16 +29,23 @@ class WidgetDataManager {
     func updateWidgetData(
         todayTotal: Double,
         yesterdayTotal: Double,
-        lastTransaction: Double,
-        lastTransactionNote: String,
+        lastTransaction: Double?,
+        lastTransactionNote: String?,
         currencySymbol: String,
         colorTheme: String,
         themeMode: String
     ) {
         sharedDefaults?.set(todayTotal, forKey: todayTotalKey)
         sharedDefaults?.set(yesterdayTotal, forKey: yesterdayTotalKey)
-        sharedDefaults?.set(lastTransaction, forKey: lastTransactionKey)
-        sharedDefaults?.set(lastTransactionNote, forKey: lastTransactionNoteKey)
+        
+        if let lastTransaction = lastTransaction {
+            sharedDefaults?.set(lastTransaction, forKey: lastTransactionKey)
+        }
+        
+        if let lastTransactionNote = lastTransactionNote {
+            sharedDefaults?.set(lastTransactionNote, forKey: lastTransactionNoteKey)
+        }
+        
         sharedDefaults?.set(Date(), forKey: lastUpdateKey)
         sharedDefaults?.set(currencySymbol, forKey: currencySymbolKey)
         sharedDefaults?.set(colorTheme, forKey: colorThemeKey)
@@ -95,7 +102,7 @@ class WidgetDataManager {
             case "dark":
                 isDark = true
                 isOled = false
-            case "oled":
+            case "amoled", "oled":
                 isDark = true
                 isOled = true
             case "light":
@@ -152,6 +159,14 @@ class WidgetDataManager {
     }
     
     func getWidgetTheme(isDark: Bool) -> WidgetTheme {
+        // Check if user has enabled theme matching for widget
+        let matchTheme = sharedDefaults?.bool(forKey: "widget_match_theme") ?? true
+        
+        if !matchTheme {
+            // Force default theme if matching is disabled
+            return WidgetTheme.forTheme("default", themeMode: themeMode, systemIsDark: isDark)
+        }
+        
         return WidgetTheme.forTheme(colorTheme, themeMode: themeMode, systemIsDark: isDark)
     }
 }

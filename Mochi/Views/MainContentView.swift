@@ -48,7 +48,7 @@ struct MainContentView: View {
         return yesterdayItems.reduce(0) { $0 + $1.amount }
     }
     
-    func updateWidgetData() {
+    func updateWidgetData(includeLastTransaction: Bool = true) {
         let lastItem = items.first
         let lastTransactionAmount = lastItem?.amount ?? 0
         let lastTransactionNote = lastItem?.note ?? ""
@@ -56,13 +56,17 @@ struct MainContentView: View {
         WidgetDataManager.shared.updateWidgetData(
             todayTotal: dailyTotal,
             yesterdayTotal: yesterdayTotal,
-            lastTransaction: lastTransactionAmount,
-            lastTransactionNote: lastTransactionNote,
+            lastTransaction: includeLastTransaction ? lastTransactionAmount : nil,
+            lastTransactionNote: includeLastTransaction ? lastTransactionNote : nil,
             currencySymbol: settings.currencySymbol,
             colorTheme: settings.colorTheme,
             themeMode: settings.themeMode
         )
         // Refresh widgets immediately
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    static func reloadWidget() {
         WidgetCenter.shared.reloadAllTimelines()
     }
     
@@ -310,9 +314,15 @@ struct MainContentView: View {
             // Update widget data
             updateWidgetData()
         }
-        .onChange(of: items.count) { _, _ in
+        .onChange(of: items.count) { oldValue, newValue in
             // Update widget when items change
-            updateWidgetData()
+            // If deleting (newValue < oldValue), we let HistoryView (or delete handler) set the "Removed" state.
+            // But we MUST update Totals. We pass false to avoid overwriting the "Removed" note with the old transaction.
+            if newValue < oldValue {
+                updateWidgetData(includeLastTransaction: false)
+            } else {
+                updateWidgetData(includeLastTransaction: true)
+            }
         }
         .onChange(of: settings.colorTheme) { _, _ in updateWidgetData() }
         .onChange(of: settings.themeMode) { _, _ in updateWidgetData() }

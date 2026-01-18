@@ -14,6 +14,7 @@ class SettingsManager: ObservableObject {
     @AppStorage("themeMode") var themeMode: String = "auto"
     @AppStorage("colorTheme") var colorTheme: String = "default" // default, pink, blue, green, butterscotch, brown
     @AppStorage("customCurrencyCode") var customCurrencyCode: String = "" // Stores ISO code (e.g. "USD", "KRW")
+    @AppStorage("widgetMatchTheme") var widgetMatchTheme: Bool = true // Should widget match app theme?
     
     // Day Settings
     @AppStorage("dayStartHour") var dayStartHour: Int = 0 // 0 = Midnight

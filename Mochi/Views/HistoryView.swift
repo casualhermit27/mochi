@@ -503,6 +503,19 @@ struct HistoryView: View {
             if pendingDeletions[item.persistentModelID] != nil {
                 pendingDeletions.removeValue(forKey: item.persistentModelID)
                 sessionDeletedAmount += item.amount
+                
+                // Update Widget specifically for deletion
+                WidgetDataManager.shared.updateWidgetData(
+                    todayTotal: 0, // Does not matter, MainView will update totals
+                    yesterdayTotal: 0,
+                    lastTransaction: -item.amount,
+                    lastTransactionNote: "",
+                    currencySymbol: settings.currencySymbol,
+                    colorTheme: settings.colorTheme,
+                    themeMode: settings.themeMode
+                )
+                // Note: MainView will follow up with correct Totals due to items.count change
+                
                 modelContext.delete(item)
             }
         }
@@ -596,6 +609,17 @@ struct HistoryView: View {
         
         // Update session tracking if needed
         sessionDeletedAmount += amountDeleted
+        
+        // Update Widget for Bulk Deletion
+        WidgetDataManager.shared.updateWidgetData(
+            todayTotal: 0,
+            yesterdayTotal: 0,
+            lastTransaction: -amountDeleted,
+            lastTransactionNote: "",
+            currencySymbol: settings.currencySymbol,
+            colorTheme: settings.colorTheme,
+            themeMode: settings.themeMode
+        )
         
         // Reset Selection
         selectedItems.removeAll()

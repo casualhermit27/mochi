@@ -386,6 +386,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -398,7 +399,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Mochi;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harsha;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -418,6 +419,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -430,7 +432,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Mochi;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harsha;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -450,6 +452,7 @@
 				CODE_SIGN_ENTITLEMENTS = MochiWidget/MochiWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MochiWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MochiWidget;
@@ -460,7 +463,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Mochi.MochiWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi.MochiWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -480,6 +483,7 @@
 				CODE_SIGN_ENTITLEMENTS = MochiWidget/MochiWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MochiWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MochiWidget;
@@ -490,7 +494,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Mochi.MochiWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi.MochiWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

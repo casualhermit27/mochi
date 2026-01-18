@@ -9,17 +9,47 @@ struct PaywallView: View {
     @State private var packages: [Package] = []
     @State private var isLoading = false
     
-    // Creamy Aesthetic Colors
-    let creamBackground = Color(red: 0.98, green: 0.96, blue: 0.93)
-    let creamAccent = Color(red: 0.95, green: 0.90, blue: 0.82)
-    let warmBrown = Color(red: 0.45, green: 0.35, blue: 0.28)
-    let softGold = Color(red: 0.85, green: 0.72, blue: 0.45)
-    let mintGreen = Color(red: 0.35, green: 0.65, blue: 0.55)
+    @ObservedObject var settings = SettingsManager.shared
+    
+    // Dynamic Theme Logic
+    var isNightTime: Bool {
+        if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
+        if settings.themeMode == "light" { return false }
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour < 6 || hour >= 20
+    }
+    
+    var currentTheme: SettingsManager.PastelTheme {
+        settings.currentPastelTheme
+    }
+    
+    // Adaptive Colors
+    var dynamicBackground: Color {
+        if settings.themeMode == "amoled" { return Color.black }
+        if settings.colorTheme != "default" {
+            return isNightTime ? currentTheme.backgroundDark : currentTheme.background
+        }
+        return Color(UIColor.systemBackground)
+    }
+    
+    var dynamicText: Color {
+        if settings.colorTheme != "default" {
+            return isNightTime ? currentTheme.textDark : currentTheme.text
+        }
+        return .primary
+    }
+    
+    var dynamicAccent: Color {
+        if settings.colorTheme != "default" {
+            return currentTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
     
     var body: some View {
         ZStack {
-            // Creamy Background
-            creamBackground.ignoresSafeArea()
+            // Dynamic Background
+            dynamicBackground.ignoresSafeArea()
             
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 32) {
@@ -32,9 +62,9 @@ struct PaywallView: View {
                             Button(action: { dismiss() }) {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(warmBrown.opacity(0.4))
+                                    .foregroundColor(dynamicText.opacity(0.4))
                                     .frame(width: 28, height: 28)
-                                    .background(warmBrown.opacity(0.06))
+                                    .background(dynamicText.opacity(0.06))
                                     .clipShape(Circle())
                             }
                         }
@@ -53,33 +83,51 @@ struct PaywallView: View {
                             
                             Text("+")
                                 .font(.system(size: 36, weight: .medium, design: .rounded))
-                                .foregroundColor(mintGreen)
+                                .foregroundColor(dynamicAccent)
                         }
                         
                         Text("Unlock everything")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundColor(warmBrown.opacity(0.5))
+                            .foregroundColor(dynamicText.opacity(0.5))
                     }
                     
                     // Features (minimal)
                     HStack(spacing: 24) {
-                        FeatureIcon(icon: "clock.fill", label: "History")
-                        FeatureIcon(icon: "paintbrush.fill", label: "Themes")
-                        FeatureIcon(icon: "arrow.up.doc.fill", label: "Export")
-                        FeatureIcon(icon: "square.grid.2x2.fill", label: "Widget")
+                        FeatureIcon(icon: "clock.fill", label: "History", color: dynamicText)
+                        FeatureIcon(icon: "paintbrush.fill", label: "Themes", color: dynamicText)
+                        FeatureIcon(icon: "arrow.up.doc.fill", label: "Export", color: dynamicText)
+                        FeatureIcon(icon: "square.grid.2x2.fill", label: "Widget", color: dynamicText)
                     }
-                    .foregroundColor(warmBrown)
+                    
+                    // Widget Preview
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Beautiful Home Screen Widgets")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundColor(dynamicText.opacity(0.6))
+                            .padding(.horizontal, 24)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                WidgetPreviewView(size: .small, theme: .pink)
+                                WidgetPreviewView(size: .medium, theme: .blue)
+                                WidgetPreviewView(size: .small, theme: .green)
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20) // Space for shadow
+                        }
+                    }
                     
                     // Pricing Plans
                     VStack(spacing: 10) {
                         if packages.isEmpty {
-                            // Fallback static plans (before RevenueCat is configured)
+                            // Fallback static plans
                             ForEach(StaticPlan.all) { plan in
                                 StaticPlanCard(
                                     plan: plan,
                                     isSelected: selectedStaticPlan?.id == plan.id,
-                                    warmBrown: warmBrown,
-                                    mintGreen: mintGreen
+                                    textColor: dynamicText,
+                                    accentColor: dynamicAccent,
+                                    isNightTime: isNightTime
                                 ) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         selectedStaticPlan = plan
@@ -93,8 +141,9 @@ struct PaywallView: View {
                                 PackageCard(
                                     package: package,
                                     isSelected: selectedPackage?.identifier == package.identifier,
-                                    warmBrown: warmBrown,
-                                    mintGreen: mintGreen
+                                    textColor: dynamicText,
+                                    accentColor: dynamicAccent,
+                                    isNightTime: isNightTime
                                 ) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         selectedPackage = package
@@ -117,10 +166,10 @@ struct PaywallView: View {
                                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                             }
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(settings.colorTheme == "default" && !isNightTime ? .white : (isNightTime ? currentTheme.backgroundDark : .white))
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(mintGreen)
+                        .background(dynamicAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .disabled(isLoading || (selectedPackage == nil && selectedStaticPlan == nil))
@@ -131,11 +180,11 @@ struct PaywallView: View {
                         if let pkg = selectedPackage {
                             Text("7 days free, then \(pkg.localizedPriceString)/\(periodLabel(for: pkg.packageType))")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(warmBrown.opacity(0.4))
+                                .foregroundColor(dynamicText.opacity(0.4))
                         } else if let plan = selectedStaticPlan {
                             Text("7 days free, then \(plan.price)\(plan.period)")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(warmBrown.opacity(0.4))
+                                .foregroundColor(dynamicText.opacity(0.4))
                         }
                         
                         HStack(spacing: 12) {
@@ -146,13 +195,13 @@ struct PaywallView: View {
                             Button("Privacy") { }
                         }
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(warmBrown.opacity(0.3))
+                        .foregroundColor(dynamicText.opacity(0.3))
                     }
                     .padding(.bottom, 24)
                 }
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(isNightTime ? .dark : .light)
         .task {
             await loadOfferings()
         }
@@ -214,88 +263,35 @@ struct PaywallView: View {
 
 // MARK: - Feature Icon (Minimal)
 
+// MARK: - Feature Icon (Minimal)
+
 struct FeatureIcon: View {
     let icon: String
     let label: String
+    let color: Color
     
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 22, weight: .medium))
-                .opacity(0.8)
+                .foregroundColor(color.opacity(0.8))
             Text(label)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .opacity(0.6)
+                .foregroundColor(color.opacity(0.6))
         }
     }
 }
 
-// MARK: - Minimal Plan Card
-
-struct MinimalPlanCard: View {
-    let plan: SubscriptionPlan
-    let isSelected: Bool
-    let warmBrown: Color
-    let mintGreen: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(plan.name)
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(warmBrown)
-                        
-                        if let badge = plan.badge {
-                            Text(badge)
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(mintGreen)
-                        }
-                    }
-                    
-                    if let savings = plan.savings {
-                        Text(savings)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(warmBrown.opacity(0.4))
-                    }
-                }
-                
-                Spacer()
-                
-                Text(plan.price)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(warmBrown)
-                
-                // Selection Indicator
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundColor(isSelected ? mintGreen : warmBrown.opacity(0.15))
-                    .padding(.leading, 8)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.white : Color.white.opacity(0.6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(isSelected ? mintGreen.opacity(0.5) : warmBrown.opacity(0.08), lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
+// MARK: - Package Card (RevenueCat)
 
 // MARK: - Package Card (RevenueCat)
 
 struct PackageCard: View {
     let package: Package
     let isSelected: Bool
-    let warmBrown: Color
-    let mintGreen: Color
+    let textColor: Color
+    let accentColor: Color
+    let isNightTime: Bool
     let action: () -> Void
     
     var packageName: String {
@@ -315,6 +311,22 @@ struct PackageCard: View {
         }
     }
     
+    // Computed colors for contrast
+    var activeTextColor: Color {
+        if isSelected && isNightTime {
+            return Color.black.opacity(0.8)
+        }
+        return textColor
+    }
+    
+    var activeBackgroundColor: Color {
+        if isSelected {
+            return Color.white
+        } else {
+            return isNightTime ? Color.white.opacity(0.12) : Color.white.opacity(0.6)
+        }
+    }
+    
     var body: some View {
         Button(action: action) {
             HStack {
@@ -322,23 +334,23 @@ struct PackageCard: View {
                     HStack(spacing: 6) {
                         Text(packageName)
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(warmBrown)
+                            .foregroundColor(activeTextColor)
                         
                         if let badge = badge {
                             Text(badge)
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(mintGreen)
+                                .foregroundColor(accentColor)
                         }
                     }
                     
                     if package.packageType == .annual {
                         Text("Save 14%")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(warmBrown.opacity(0.4))
+                            .foregroundColor(activeTextColor.opacity(0.6))
                     } else if package.packageType == .lifetime {
                         Text("Pay once, own forever")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(warmBrown.opacity(0.4))
+                            .foregroundColor(activeTextColor.opacity(0.6))
                     }
                 }
                 
@@ -346,22 +358,22 @@ struct PackageCard: View {
                 
                 Text(package.localizedPriceString)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(warmBrown)
+                    .foregroundColor(activeTextColor)
                 
                 // Selection Indicator
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundColor(isSelected ? mintGreen : warmBrown.opacity(0.15))
+                    .foregroundColor(isSelected ? accentColor : activeTextColor.opacity(0.15))
                     .padding(.leading, 8)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.white : Color.white.opacity(0.6))
+                    .fill(activeBackgroundColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(isSelected ? mintGreen.opacity(0.5) : warmBrown.opacity(0.08), lineWidth: 1)
+                            .stroke(isSelected ? accentColor.opacity(0.5) : activeTextColor.opacity(0.08), lineWidth: 1)
                     )
             )
         }
@@ -414,9 +426,26 @@ struct StaticPlan: Identifiable, Equatable {
 struct StaticPlanCard: View {
     let plan: StaticPlan
     let isSelected: Bool
-    let warmBrown: Color
-    let mintGreen: Color
+    let textColor: Color
+    let accentColor: Color
+    let isNightTime: Bool
     let action: () -> Void
+    
+    // Computed colors for contrast
+    var activeTextColor: Color {
+        if isSelected && isNightTime {
+            return Color.black.opacity(0.8)
+        }
+        return textColor
+    }
+    
+    var activeBackgroundColor: Color {
+        if isSelected {
+            return Color.white
+        } else {
+            return isNightTime ? Color.white.opacity(0.12) : Color.white.opacity(0.6)
+        }
+    }
     
     var body: some View {
         Button(action: action) {
@@ -425,19 +454,19 @@ struct StaticPlanCard: View {
                     HStack(spacing: 6) {
                         Text(plan.name)
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(warmBrown)
+                            .foregroundColor(activeTextColor)
                         
                         if let badge = plan.badge {
                             Text(badge)
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(mintGreen)
+                                .foregroundColor(accentColor)
                         }
                     }
                     
                     if let savings = plan.savings {
                         Text(savings)
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(warmBrown.opacity(0.4))
+                            .foregroundColor(activeTextColor.opacity(0.6))
                     }
                 }
                 
@@ -445,22 +474,22 @@ struct StaticPlanCard: View {
                 
                 Text(plan.price)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(warmBrown)
+                    .foregroundColor(activeTextColor)
                 
                 // Selection Indicator
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundColor(isSelected ? mintGreen : warmBrown.opacity(0.15))
+                    .foregroundColor(isSelected ? accentColor : activeTextColor.opacity(0.15))
                     .padding(.leading, 8)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.white : Color.white.opacity(0.6))
+                    .fill(activeBackgroundColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(isSelected ? mintGreen.opacity(0.5) : warmBrown.opacity(0.08), lineWidth: 1)
+                            .stroke(isSelected ? accentColor.opacity(0.5) : activeTextColor.opacity(0.08), lineWidth: 1)
                     )
             )
         }

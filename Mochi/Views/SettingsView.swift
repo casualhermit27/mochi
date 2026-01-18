@@ -114,6 +114,30 @@ struct SettingsView: View {
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 8)
                             }
+                            
+                            Divider()
+                                .background(dynamicText.opacity(0.1))
+                                .padding(.horizontal, 4)
+                            
+                            Toggle(isOn: $settings.widgetMatchTheme) {
+                                Text("Match Widget Theme")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                    .foregroundColor(dynamicText)
+                            }
+                            .tint(accentColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                            .onChange(of: settings.widgetMatchTheme) { _, newValue in
+                                // Sync to App Group immediately so widget picks it up
+                                if let defaults = UserDefaults(suiteName: "group.com.mochi.spent") {
+                                    defaults.set(newValue, forKey: "widget_match_theme")
+                                    // Reload widget
+                                    if let url = URL(string: "widget-reload://") {
+                                         // Trigger logic if needed, but WidgetCenter is better
+                                        MainContentView.reloadWidget()
+                                    }
+                                }
+                            }
                         }
                         
                         // 2. Currency
