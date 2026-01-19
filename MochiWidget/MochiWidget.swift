@@ -87,46 +87,6 @@ struct MochiWidgetEntryView : View {
                     .frame(width: 2)
                     .clipShape(Capsule())
                 
-<<<<<<< HEAD
-                // Main Amount (Center)
-                Text("\(currencySymbol) \(formatAmount(todayTotal))")
-                    .font(.system(size: 44, weight: .bold, design: .monospaced))
-                    .foregroundColor(theme.text)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                
-                Spacer()
-                
-                // Footer (Last Transaction)
-                VStack(spacing: 6) {
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundColor(theme.text.opacity(0.1))
-                    
-                    HStack(spacing: 4) {
-                        // Last Transaction
-                        if lastTransaction > 0 {
-                            Text(lastTransactionNote.isEmpty ? "LAST" : lastTransactionNote.uppercased())
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(theme.text.opacity(0.5))
-                                .lineLimit(1)
-                            
-                            Spacer()
-                            
-                            Text("+ \(currencySymbol)\(formatAmount(lastTransaction))")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(theme.text)
-
-                        } else {
-                            Text("NO SPEND")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(theme.text.opacity(0.5))
-                            
-                            Spacer()
-                        }
-                    }
-=======
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TODAY")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -146,7 +106,10 @@ struct MochiWidgetEntryView : View {
                 }
                 Spacer()
             }
-            // Background is provided by system for accessory widgets
+            .containerBackground(for: .widget) {
+                 // System provides background
+                 Color.clear
+            }
             
         default:
             // Home Screen Widgets
@@ -213,7 +176,6 @@ struct MochiWidgetEntryView : View {
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .contentTransition(.numericText())
->>>>>>> eed06f7 (Added home and lock screen widgets)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)
@@ -221,15 +183,6 @@ struct MochiWidgetEntryView : View {
             .containerBackground(for: .widget) {
                 theme.background
             }
-<<<<<<< HEAD
-            .padding(.top, 16)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-        }
-        .containerBackground(for: .widget) {
-            theme.background
-=======
->>>>>>> eed06f7 (Added home and lock screen widgets)
         }
     }
     

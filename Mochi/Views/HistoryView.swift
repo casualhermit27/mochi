@@ -318,12 +318,10 @@ struct HistoryView: View {
                             .listRowBackground(Color.clear)
                     }
                 }.onAppear {
-                    // Expand Today by default if empty
-                    if expandedDays.isEmpty {
-                        // Find today
-                        let today = settings.getRitualDay(for: Date())
-                        expandedDays.insert(today)
-                    }
+                    // Always expand ONLY Today when opening history
+                    // This ensures "new day" stuff shows up and "old day" collapses
+                    let today = settings.getRitualDay(for: Date())
+                    expandedDays = [today]
                 }
                 .scrollContentBackground(.hidden)
                 .background(dynamicBackground)

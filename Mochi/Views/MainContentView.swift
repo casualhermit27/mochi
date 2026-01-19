@@ -216,9 +216,9 @@ struct MainContentView: View {
                     .scaleEffect(numberScale)
                     .scaleEffect(breathingScale)
                     .offset(x: wiggleOffset)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: numberScale)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: displayValue)
-                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: numberScale)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: displayValue)
+                    .contentTransition(.numericText(countsDown: false))
                     
                     // Side Adding Animation
                     if showAddedAnimation {
