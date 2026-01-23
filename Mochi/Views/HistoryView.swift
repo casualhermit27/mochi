@@ -85,6 +85,7 @@ struct HistoryView: View {
         let amount: Double
         let timestamp: Date
         let note: String?
+        let paymentMethodId: String?
     }
     
     var groupedItems: [Date: [Item]] {
@@ -159,8 +160,16 @@ struct HistoryView: View {
                                                 
                                                 HStack {
                                                     VStack(alignment: .leading, spacing: 4) {
-                                                        Text(item.timestamp, format: .dateTime.hour().minute())
-                                                            .foregroundColor(dynamicSecondary)
+                                                        HStack(spacing: 8) {
+                                                            Text(item.timestamp, format: .dateTime.hour().minute())
+                                                                .foregroundColor(dynamicSecondary)
+                                                            
+                                                            if let methodId = item.paymentMethodId,
+                                                               let method = settings.getPaymentMethod(by: methodId) {
+                                                                CompactPaymentBadge(method: method, dynamicText: dynamicText)
+                                                            }
+                                                        }
+                                                        
                                                         if let note = item.note, !note.isEmpty {
                                                             Text(note)
                                                                 .font(.system(size: 12, design: .monospaced))
@@ -599,7 +608,12 @@ struct HistoryView: View {
         
         for id in selectedItems {
             if let item = items.first(where: { $0.persistentModelID == id }) {
-                undoSnapshots.append(SnapshotItem(amount: item.amount, timestamp: item.timestamp, note: item.note))
+                undoSnapshots.append(SnapshotItem(
+                    amount: item.amount, 
+                    timestamp: item.timestamp, 
+                    note: item.note,
+                    paymentMethodId: item.paymentMethodId
+                ))
                 amountDeleted += item.amount
                 modelContext.delete(item)
             }
@@ -648,7 +662,12 @@ struct HistoryView: View {
         
         // Restore items
         for snapshot in undoSnapshots {
-            let newItem = Item(timestamp: snapshot.timestamp, amount: snapshot.amount, note: snapshot.note)
+            let newItem = Item(
+                timestamp: snapshot.timestamp, 
+                amount: snapshot.amount, 
+                note: snapshot.note,
+                paymentMethodId: snapshot.paymentMethodId
+            )
             modelContext.insert(newItem)
             sessionDeletedAmount -= snapshot.amount
         }

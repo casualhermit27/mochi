@@ -35,6 +35,9 @@ struct MainContentView: View {
     @State private var shakeRippleScale: CGFloat = 0
     @State private var shakeRippleOpacity: Double = 0
     
+    // Payment Method Selector
+    @State private var showPaymentSelector = false
+    
     var dailyTotal: Double {
         let currentRitualDay = settings.getRitualDay(for: Date())
         let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
@@ -248,6 +251,21 @@ struct MainContentView: View {
                 
                 Spacer()
                 
+                // Payment Method Selector (Subtle, appears when inputting)
+                if isEffectivelyInputting || showPaymentSelector {
+                    PaymentMethodSelector(
+                        isVisible: $showPaymentSelector,
+                        dynamicText: dynamicText,
+                        dynamicBackground: dynamicBackground,
+                        accentColor: accentColor
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9)),
+                        removal: .opacity.combined(with: .scale(scale: 0.95))
+                    ))
+                    .padding(.bottom, 12)
+                }
+                
                 // Keypad
                 KeypadView(onTap: handleKeypadInput, textColor: dynamicText)
                     .padding(.bottom, 20)
@@ -285,7 +303,7 @@ struct MainContentView: View {
                 .zIndex(100)
             }
         }
-        .highPriorityGesture(dragGesture)
+        .simultaneousGesture(dragGesture)
         .sheet(isPresented: $showHistory) {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
@@ -392,7 +410,8 @@ struct MainContentView: View {
         
         HapticManager.shared.rigidImpact()
         
-        let newItem = Item(timestamp: Date(), amount: amount)
+        let methodId = settings.selectedPaymentMethod.id.uuidString
+        let newItem = Item(timestamp: Date(), amount: amount, paymentMethodId: methodId)
         modelContext.insert(newItem)
         
         // Update Undo State

@@ -44,6 +44,80 @@ class SettingsManager: ObservableObject {
     @AppStorage("hapticsEnabled") var hapticsEnabled: Bool = true
     @AppStorage("soundsEnabled") var soundsEnabled: Bool = true
     
+    // MARK: - Payment Methods
+    @AppStorage("paymentMethodsData") private var paymentMethodsData: Data = Data()
+    
+    @Published var selectedPaymentMethodId: String {
+        didSet {
+            UserDefaults.standard.set(selectedPaymentMethodId, forKey: "selectedPaymentMethodId")
+        }
+    }
+    
+    init() {
+        self.selectedPaymentMethodId = UserDefaults.standard.string(forKey: "selectedPaymentMethodId") ?? PaymentMethod.defaultCash.id.uuidString
+    }
+    
+    var paymentMethods: [PaymentMethod] {
+        get {
+            guard !paymentMethodsData.isEmpty,
+                  let methods = try? JSONDecoder().decode([PaymentMethod].self, from: paymentMethodsData) else {
+                return [PaymentMethod.defaultCash]
+            }
+            return methods.isEmpty ? [PaymentMethod.defaultCash] : methods
+        }
+        set {
+            if let encoded = try? JSONEncoder().encode(newValue) {
+                paymentMethodsData = encoded
+                objectWillChange.send()
+            }
+        }
+    }
+    
+    var selectedPaymentMethod: PaymentMethod {
+        if let method = paymentMethods.first(where: { $0.id.uuidString == selectedPaymentMethodId }) {
+            return method
+        }
+        return paymentMethods.first ?? PaymentMethod.defaultCash
+    }
+    
+    func addPaymentMethod(_ method: PaymentMethod) {
+        var methods = paymentMethods
+        methods.append(method)
+        paymentMethods = methods
+    }
+    
+    func updatePaymentMethod(_ method: PaymentMethod) {
+        var methods = paymentMethods
+        if let index = methods.firstIndex(where: { $0.id == method.id }) {
+            methods[index] = method
+            paymentMethods = methods
+        }
+    }
+    
+    func deletePaymentMethod(_ method: PaymentMethod) {
+        var methods = paymentMethods
+        methods.removeAll { $0.id == method.id }
+        // Ensure we always have at least one method
+        if methods.isEmpty {
+            methods = [PaymentMethod.defaultCash]
+        }
+        paymentMethods = methods
+        
+        // Reset selection if deleted
+        if selectedPaymentMethodId == method.id.uuidString {
+            selectedPaymentMethodId = methods.first?.id.uuidString ?? PaymentMethod.defaultCash.id.uuidString
+        }
+    }
+    
+    func selectPaymentMethod(_ method: PaymentMethod) {
+        selectedPaymentMethodId = method.id.uuidString
+    }
+    
+    func getPaymentMethod(by id: String?) -> PaymentMethod? {
+        guard let id = id, !id.isEmpty else { return PaymentMethod.defaultCash }
+        return paymentMethods.first { $0.id.uuidString == id } ?? PaymentMethod.defaultCash
+    }
+    
     // MARK: - Pastel Theme Colors
     
     struct PastelTheme: Identifiable, Equatable {

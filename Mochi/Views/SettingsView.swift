@@ -168,6 +168,43 @@ struct SettingsView: View {
                             .buttonStyle(.plain)
                         }
                         
+                        // 2.5 Payment Methods
+                        SettingsSection(icon: "creditcard.fill", title: "PAYMENT METHODS", textColor: dynamicText) {
+                            NavigationLink(destination: PaymentMethodsView(dynamicText: dynamicText)) {
+                                HStack {
+                                    HStack(spacing: 10) {
+                                        // Preview card (Flat)
+                                        Image(systemName: settings.selectedPaymentMethod.type == .cash ? "banknote" : "creditcard")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(settings.selectedPaymentMethod.color)
+                                            .frame(width: 32, height: 22)
+                                            .background(settings.selectedPaymentMethod.color.opacity(0.1))
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        
+                                        Text(settings.selectedPaymentMethod.name)
+                                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    HStack(spacing: 4) {
+                                        Text("\(settings.paymentMethods.count)")
+                                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText.opacity(0.4))
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(dynamicText.opacity(0.3))
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
                         // 3. Notifications
                         SettingsSection(icon: "bell.badge.fill", title: "NOTIFICATIONS", textColor: dynamicText) {
                             VStack(spacing: 0) {
