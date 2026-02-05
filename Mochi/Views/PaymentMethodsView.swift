@@ -52,7 +52,7 @@ struct PaymentMethodsView: View {
                     Spacer()
                     
                     Text("Payment Methods")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(dynamicText)
                     
                     Spacer()
@@ -108,7 +108,7 @@ struct PaymentMethodsView: View {
                                 }
                                 
                                 Text("Add a card or wallet")
-                                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                                    .font(.system(size: 15, weight: .medium, design: .monospaced))
                                     .foregroundColor(dynamicText.opacity(0.5))
                                 
                                 Spacer()
@@ -128,12 +128,16 @@ struct PaymentMethodsView: View {
         .sheet(isPresented: $showAddSheet) {
             AddEditPaymentMethodView(dynamicText: dynamicText, editingMethod: nil)
                 .presentationDetents([.medium])
-                .presentationCornerRadius(24)
+                .presentationCornerRadius(32)
+                .presentationBackground(dynamicBackground)
+                .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(item: $editingMethod) { method in
             AddEditPaymentMethodView(dynamicText: dynamicText, editingMethod: method)
                 .presentationDetents([.medium])
-                .presentationCornerRadius(24)
+                .presentationCornerRadius(32)
+                .presentationBackground(dynamicBackground)
+                .preferredColorScheme(isNightTime ? .dark : .light)
         }
     }
 }
@@ -164,11 +168,11 @@ struct PaymentMethodCard: View {
                 // Name & Type
                 VStack(alignment: .leading, spacing: 2) {
                     Text(method.name)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
                         .foregroundColor(dynamicText)
                     
                     Text(method.type.rawValue.capitalized)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(dynamicText.opacity(0.5))
                 }
                 
@@ -266,7 +270,7 @@ struct AddEditPaymentMethodView: View {
                         .foregroundColor(dynamicText)
                     
                     Text(isEditing ? "Edit Method" : "New Method")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
                         .foregroundColor(dynamicText)
                 }
                 .padding(.top, 8)
@@ -275,12 +279,12 @@ struct AddEditPaymentMethodView: View {
                     // Minimal Name Input
                     VStack(alignment: .leading, spacing: 12) {
                         Text("NAME")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(dynamicText.opacity(0.3))
                             .tracking(1.5)
                         
                         TextField("", text: $name, prompt: Text("Apple Card, Cash, etc.").foregroundColor(dynamicText.opacity(0.2)))
-                            .font(.system(size: 20, weight: .medium, design: .rounded))
+                            .font(.system(size: 20, weight: .medium, design: .monospaced))
                             .foregroundColor(dynamicText)
                             .tint(dynamicText.opacity(0.5))
                         
@@ -292,7 +296,7 @@ struct AddEditPaymentMethodView: View {
                     // Type Selector (Minimal)
                     VStack(alignment: .leading, spacing: 16) {
                         Text("TYPE")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(dynamicText.opacity(0.3))
                             .tracking(1.5)
                         
@@ -308,7 +312,7 @@ struct AddEditPaymentMethodView: View {
                                         Image(systemName: type == .cash ? "banknote" : "creditcard")
                                             .font(.system(size: 16, weight: selectedType == type ? .semibold : .regular))
                                         Text(type.rawValue.capitalized)
-                                            .font(.system(size: 16, weight: selectedType == type ? .semibold : .medium, design: .rounded))
+                                            .font(.system(size: 16, weight: selectedType == type ? .semibold : .medium, design: .monospaced))
                                     }
                                     .foregroundColor(dynamicText.opacity(selectedType == type ? 1.0 : 0.3))
                                     .scaleEffect(selectedType == type ? 1.05 : 1.0)
@@ -321,7 +325,7 @@ struct AddEditPaymentMethodView: View {
                     // Color Selector (Dots only, no fill/background)
                     VStack(alignment: .leading, spacing: 16) {
                         Text("PALETTE")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(dynamicText.opacity(0.3))
                             .tracking(1.5)
                         
@@ -358,18 +362,18 @@ struct AddEditPaymentMethodView: View {
                 
                 Spacer()
                 
-                // Save Button (Vibrant & Active)
+                // Save Button (Mochi Style)
                 let currentHighlightColor = Color(hex: selectedColorHex) ?? dynamicText
                 
                 Button(action: saveMethod) {
                     Text(isEditing ? "Done" : "Save Method")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(currentHighlightColor.gradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: currentHighlightColor.opacity(0.3), radius: 10, y: 5)
+                        .frame(height: 60)
+                        .background(currentHighlightColor)
+                        .clipShape(Capsule())
+                        .shadow(color: currentHighlightColor.opacity(0.3), radius: 12, y: 6)
                 }
                 .buttonStyle(SquishyButtonStyle(isDoneButton: true))
                 .padding(.horizontal, 32)

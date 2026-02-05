@@ -4,29 +4,51 @@ import Combine
 
 // MARK: - Subscription Manager (RevenueCat)
 
-class SubscriptionManager: ObservableObject {
+class SubscriptionManager: NSObject, ObservableObject {
     static let shared = SubscriptionManager()
     
-    // TODO: Replace with your RevenueCat API Key
-    private static let apiKey = "appl_YOUR_REVENUECAT_API_KEY"
-    
-    // Entitlement ID (set in RevenueCat dashboard)
-    private static let entitlementID = "pro"
+    // RevenueCat Configuration
+    private static let apiKey = "test_IpXeBAMMrCNetOFBuQQUPEsQMsL"
+    private static let entitlementID = "Mochi +"
     
     // Published state
     @Published var isPro: Bool = false
     @Published var isTrialActive: Bool = false
     @Published var trialDaysRemaining: Int = 0
     @Published var currentOffering: Offering?
+    @Published var showCustomerCenter: Bool = false
+    @Published var showPaywall: Bool = false
     
-    private init() {
+    // Debug Override
+    @Published var debugForcedPro: Bool {
+        didSet {
+            UserDefaults.standard.set(debugForcedPro, forKey: "debug_forced_pro")
+            checkSubscriptionStatusSync()
+        }
+    }
+    
+    // Local Trial State
+    private let localTrialKey = "local_trial_end_date"
+    var localTrialEndDate: Date? {
+        get { UserDefaults.standard.object(forKey: localTrialKey) as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: localTrialKey) }
+    }
+    
+    override private init() {
+        self.debugForcedPro = UserDefaults.standard.bool(forKey: "debug_forced_pro")
+        super.init()
+        
         // Configure RevenueCat
         Purchases.logLevel = .debug
         Purchases.configure(withAPIKey: Self.apiKey)
         
-        // Check subscription status on launch
+        // Listen for customer info changes
+        Purchases.shared.delegate = self
+        
+        // Initial status check
         Task {
             await checkSubscriptionStatus()
+            await fetchOfferings()
         }
     }
     
@@ -38,36 +60,52 @@ class SubscriptionManager: ObservableObject {
             let customerInfo = try await Purchases.shared.customerInfo()
             updateStatus(from: customerInfo)
         } catch {
+            #if DEBUG
             print("❌ Failed to get customer info: \(error)")
+            #endif
         }
     }
     
-    private func updateStatus(from customerInfo: CustomerInfo) {
-        DispatchQueue.main.async {
-            // Check if user has "pro" entitlement
-            let entitlement = customerInfo.entitlements[Self.entitlementID]
-            self.isPro = entitlement?.isActive == true
-            
-            // Check trial status
-            if let expirationDate = entitlement?.expirationDate,
-               entitlement?.periodType == .trial {
-                self.isTrialActive = true
-                let days = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
-                self.trialDaysRemaining = max(0, days)
-            } else {
-                self.isTrialActive = false
-                self.trialDaysRemaining = 0
-            }
+    private func checkSubscriptionStatusSync() {
+        let entitlementActive = Purchases.shared.cachedCustomerInfo?.entitlements[Self.entitlementID]?.isActive == true
+        let isLocalTrialValid = (localTrialEndDate ?? .distantPast) > Date()
+        self.isPro = debugForcedPro || entitlementActive || isLocalTrialValid
+    }
+    
+    @MainActor
+    func updateStatus(from customerInfo: CustomerInfo) {
+        // Check if user has "Mochi +" entitlement
+        let entitlement = customerInfo.entitlements[Self.entitlementID]
+        let entitlementActive = entitlement?.isActive == true
+        let isLocalTrialValid = (localTrialEndDate ?? .distantPast) > Date()
+        
+        self.isPro = debugForcedPro || entitlementActive || isLocalTrialValid
+        
+        // Check trial status (StoreKit)
+        if let expirationDate = entitlement?.expirationDate,
+           entitlement?.periodType == .trial {
+            self.isTrialActive = true
+            let days = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
+            self.trialDaysRemaining = max(0, days)
+        } else if isLocalTrialValid {
+            // Local trial is active
+            self.isTrialActive = true
+            let days = Calendar.current.dateComponents([.day], from: Date(), to: localTrialEndDate!).day ?? 0
+            self.trialDaysRemaining = max(0, days)
+        } else {
+            self.isTrialActive = false
+            self.trialDaysRemaining = 0
         }
     }
     
-    // MARK: - Feature Access
-    
-    var hasFullAccess: Bool { isPro }
-    var canAccessHistory: Bool { isPro }
-    var canAccessThemes: Bool { isPro }
-    var canExport: Bool { isPro }
-    var canUseWidget: Bool { isPro }
+    func startLocalTrial() {
+        // Start a 3-day trial from now
+        let endDate = Calendar.current.date(byAdding: .day, value: 3, to: Date())
+        localTrialEndDate = endDate
+        Task { @MainActor in
+            checkSubscriptionStatusSync()
+        }
+    }
     
     // MARK: - Fetch Offerings
     
@@ -77,7 +115,9 @@ class SubscriptionManager: ObservableObject {
             let offerings = try await Purchases.shared.offerings()
             self.currentOffering = offerings.current
         } catch {
+            #if DEBUG
             print("❌ Failed to fetch offerings: \(error)")
+            #endif
         }
     }
     
@@ -90,7 +130,9 @@ class SubscriptionManager: ObservableObject {
             updateStatus(from: result.customerInfo)
             return !result.userCancelled
         } catch {
+            #if DEBUG
             print("❌ Purchase failed: \(error)")
+            #endif
             return false
         }
     }
@@ -104,8 +146,19 @@ class SubscriptionManager: ObservableObject {
             updateStatus(from: customerInfo)
             return isPro
         } catch {
+            #if DEBUG
             print("❌ Restore failed: \(error)")
+            #endif
             return false
+        }
+    }
+}
+
+// MARK: - Delegate Support
+extension SubscriptionManager: PurchasesDelegate {
+    func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
+        Task { @MainActor in
+            updateStatus(from: customerInfo)
         }
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import StoreKit
 
 // MARK: - Theme & Extensions
 // Moved to Util/ColorExtensions.swift
@@ -10,6 +11,7 @@ struct MainContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
     @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var notificationManager = NotificationManager.shared
     
     @State private var showHistory = false
     @State private var showToast = false
@@ -37,6 +39,9 @@ struct MainContentView: View {
     
     // Payment Method Selector
     @State private var showPaymentSelector = false
+    @State private var showPaymentMethods = false
+    
+
     
     var dailyTotal: Double {
         let currentRitualDay = settings.getRitualDay(for: Date())
@@ -63,7 +68,8 @@ struct MainContentView: View {
             lastTransactionNote: includeLastTransaction ? lastTransactionNote : nil,
             currencySymbol: settings.currencySymbol,
             colorTheme: settings.colorTheme,
-            themeMode: settings.themeMode
+            themeMode: settings.themeMode,
+            isPro: SubscriptionManager.shared.isPro
         )
         // Refresh widgets immediately
         WidgetCenter.shared.reloadAllTimelines()
@@ -160,6 +166,10 @@ struct MainContentView: View {
         isNightTime ? Color.black : Color.mochiText
     }
 
+    private var isTrialOver: Bool {
+        return settings.daysSinceFirstUse >= 3 && !SubscriptionManager.shared.isPro
+    }
+
     var body: some View {
         ZStack {
             // Background with smooth theme transition
@@ -193,24 +203,25 @@ struct MainContentView: View {
                             .font(.system(size: 24, weight: .light))
                             .foregroundColor(dynamicSecondary)
                             .padding(.trailing, 24)
-                            .padding(.vertical)
+                            .padding(.vertical, 8)
                     }
                 }
                 .padding(.top, 10)
                 
-                Spacer()
+                Spacer(minLength: 12)
+                    .frame(maxHeight: 32)
                 
                 // Display
                 ZStack {
                     HStack(spacing: 4) {
                         // Currency Symbol (Subtle)
                         Text(settings.currencySymbol)
-                            .font(.system(size: 40, weight: .medium, design: .monospaced))
-                            .foregroundColor(isEffectivelyInputting ? dynamicText : dynamicText.opacity(0.3))
+                            .font(.system(size: 48, weight: .medium, design: .monospaced))
+                            .foregroundColor(isEffectivelyInputting ? dynamicText : accentColor.opacity(0.55))
                         
                         Text(displayValue)
-                            .font(.system(size: 96, weight: .medium, design: .monospaced))
-                            .foregroundColor(isEffectivelyInputting ? dynamicText : dynamicText.opacity(0.4))
+                            .font(.system(size: 108, weight: .medium, design: .monospaced))
+                            .foregroundColor(isEffectivelyInputting ? dynamicText : accentColor.opacity(0.55))
                     }
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
@@ -243,9 +254,9 @@ struct MainContentView: View {
                 // Label indicating state
                 if !isEffectivelyInputting && dailyTotal > 0 {
                     Text("Total Spent Today")
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.system(size: 13, design: .monospaced))
                         .foregroundColor(dynamicSecondary)
-                        .padding(.top, -20)
+                        .padding(.top, -10)
                         .transition(.opacity)
                 }
                 
@@ -257,7 +268,10 @@ struct MainContentView: View {
                         isVisible: $showPaymentSelector,
                         dynamicText: dynamicText,
                         dynamicBackground: dynamicBackground,
-                        accentColor: accentColor
+                        accentColor: accentColor,
+                        onAddRequest: {
+                            showPaymentMethods = true
+                        }
                     )
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9)),
@@ -279,10 +293,19 @@ struct MainContentView: View {
                         .background(doneButtonColor)
                         .clipShape(Capsule())
                 }
-                .buttonStyle(SquishyButtonStyle(isDoneButton: true))
-                .padding(.bottom, 50)
-                .opacity(isInputActive ? 1.0 : 0.5) // Dim when not adding
-                .disabled(!isInputActive) // Disable if just showing total? No, maybe allows "0" add? But 0 add is useless.
+                .disabled(!isInputActive)
+                .padding(.bottom, 40)
+            }
+            
+            // Trial Completed Block
+            if isTrialOver {
+                TrialCompletedOverlay(
+                    dynamicText: dynamicText, 
+                    dynamicBackground: dynamicBackground, 
+                    accentColor: accentColor, 
+                    isNightTime: isNightTime
+                )
+                .transition(.opacity.combined(with: .scale(scale: 1.1)))
             }
             
             // Toast
@@ -308,6 +331,21 @@ struct MainContentView: View {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
                 .presentationCornerRadius(32)
+        }
+        .sheet(isPresented: $showPaymentMethods) {
+            NavigationStack {
+                PaymentMethodsView(dynamicText: dynamicText)
+            }
+            .presentationDetents([.large])
+            .presentationCornerRadius(32)
+            .presentationBackground(dynamicBackground)
+            .preferredColorScheme(isNightTime ? .dark : .light)
+        }
+        .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
+            if shouldDismiss {
+                showHistory = false
+                showPaymentMethods = false
+            }
         }
         .onChange(of: showHistory) { _, isPresented in
             if !isPresented && sessionDeletedAmount > 0 {
@@ -347,6 +385,12 @@ struct MainContentView: View {
         .onChange(of: settings.customCurrencyCode) { _, _ in updateWidgetData() }
         .onShake {
             undoLastAdd()
+        }
+        .onChange(of: notificationManager.shouldOpenHistory) { _, shouldOpen in
+            if shouldOpen {
+                notificationManager.shouldOpenHistory = false
+                showHistory = true
+            }
         }
     }
 
@@ -391,6 +435,8 @@ struct MainContentView: View {
                 numberScale = 1.0
             }
         }
+        
+
     }
     
     private func saveEntry() {
@@ -438,6 +484,14 @@ struct MainContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation { showAddedAnimation = false; showToast = false }
         }
+        
+        // Review Request Logic
+        let count = items.count + 1 // +1 because the query updates asynchronously usually, or we just count this one
+        if [5, 20, 50].contains(count) {
+             if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                 SKStoreReviewController.requestReview(in: scene)
+             }
+        }
     }
     
     private func undoLastAdd() {
@@ -476,6 +530,86 @@ struct MainContentView: View {
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { 
                 withAnimation { showToast = false; showAddedAnimation = false } 
+            }
+        }
+    }
+}
+
+// MARK: - Trial Completed Component
+struct TrialCompletedOverlay: View {
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let accentColor: Color
+    let isNightTime: Bool
+    
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 32) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(accentColor.opacity(0.1))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundColor(accentColor)
+                }
+                .padding(.top, 40)
+                
+                VStack(spacing: 12) {
+                    Text("Trial Completed")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    
+                    Text("You've used Mochi for 3 days.\nUpgrade to keep your data and unlock all features.")
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(dynamicText.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                
+                VStack(spacing: 16) {
+                    Button(action: {
+                        HapticManager.shared.rigidImpact()
+                        SubscriptionManager.shared.showPaywall = true
+                    }) {
+                        HStack {
+                            Text("Upgrade to Mochi +")
+                                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .bold))
+                        }
+                        .foregroundColor(isNightTime ? .black : .white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(accentColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .shadow(color: accentColor.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        Task {
+                            await SubscriptionManager.shared.restorePurchases()
+                        }
+                    }) {
+                        Text("Restore Purchases")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(dynamicText.opacity(0.4))
+                    }
+                }
+                .padding(.horizontal, 32)
+                
+                Spacer()
+                
+                // Fine print
+                Text("Your history is safe. Unlock it anytime.")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(dynamicText.opacity(0.3))
+                    .padding(.bottom, 40)
             }
         }
     }

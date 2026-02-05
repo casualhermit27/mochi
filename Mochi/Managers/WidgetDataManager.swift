@@ -33,7 +33,8 @@ class WidgetDataManager {
         lastTransactionNote: String?,
         currencySymbol: String,
         colorTheme: String,
-        themeMode: String
+        themeMode: String,
+        isPro: Bool
     ) {
         sharedDefaults?.set(todayTotal, forKey: todayTotalKey)
         sharedDefaults?.set(yesterdayTotal, forKey: yesterdayTotalKey)
@@ -50,10 +51,15 @@ class WidgetDataManager {
         sharedDefaults?.set(currencySymbol, forKey: currencySymbolKey)
         sharedDefaults?.set(colorTheme, forKey: colorThemeKey)
         sharedDefaults?.set(themeMode, forKey: themeModeKey)
+        sharedDefaults?.set(isPro, forKey: "widget_is_pro")
     }
     
     // MARK: - Read Data (Called from widget)
     
+    var isPro: Bool {
+        sharedDefaults?.bool(forKey: "widget_is_pro") ?? false
+    }
+
     var todayTotal: Double {
         sharedDefaults?.double(forKey: todayTotalKey) ?? 0
     }
@@ -161,6 +167,11 @@ class WidgetDataManager {
     func getWidgetTheme(isDark: Bool) -> WidgetTheme {
         // Check if user has enabled theme matching for widget
         let matchTheme = sharedDefaults?.bool(forKey: "widget_match_theme") ?? true
+        
+        // Gate: If not pro, always use default
+        if !isPro {
+            return WidgetTheme.forTheme("default", themeMode: themeMode, systemIsDark: isDark)
+        }
         
         if !matchTheme {
             // Force default theme if matching is disabled

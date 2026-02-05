@@ -40,9 +40,23 @@ class SettingsManager: ObservableObject {
     @AppStorage("dailyNotificationEnabled") var dailyNotificationEnabled: Bool = false
     @AppStorage("notificationTime") var notificationTime: Double = 21 * 3600 // Default 9 PM
     
+    @AppStorage("weeklyNotificationEnabled") var weeklyNotificationEnabled: Bool = false
+    @AppStorage("weeklyNotificationWeekday") var weeklyNotificationWeekday: Int = 1 // 1 = Sunday
+    
     // Haptics & Sounds
     @AppStorage("hapticsEnabled") var hapticsEnabled: Bool = true
     @AppStorage("soundsEnabled") var soundsEnabled: Bool = true
+    
+    // Onboarding
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @AppStorage("firstLaunchDate") var firstLaunchDate: Double = 0
+    
+    var daysSinceFirstUse: Int {
+        if firstLaunchDate == 0 { return 0 }
+        let startDate = Date(timeIntervalSince1970: firstLaunchDate)
+        let diff = Calendar.current.dateComponents([.day], from: startDate, to: Date()).day ?? 0
+        return diff
+    }
     
     // MARK: - Payment Methods
     @AppStorage("paymentMethodsData") private var paymentMethodsData: Data = Data()
@@ -55,6 +69,11 @@ class SettingsManager: ObservableObject {
     
     init() {
         self.selectedPaymentMethodId = UserDefaults.standard.string(forKey: "selectedPaymentMethodId") ?? PaymentMethod.defaultCash.id.uuidString
+        
+        // Initialize first launch date if not set
+        if firstLaunchDate == 0 {
+            firstLaunchDate = Date().timeIntervalSince1970
+        }
     }
     
     var paymentMethods: [PaymentMethod] {
@@ -249,7 +268,7 @@ class SettingsManager: ObservableObject {
         // pre-fill with current locale's opinion if possible, or iterate identifiers
         for id in Locale.availableIdentifiers {
             let locale = Locale(identifier: id)
-            guard let code = locale.currencyCode, let symbol = locale.currencySymbol else { continue }
+            guard let code = locale.currency?.identifier, let symbol = locale.currencySymbol else { continue }
             
             if let existing = bestSymbols[code] {
                 // Heuristics for "better" symbol:

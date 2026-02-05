@@ -21,7 +21,7 @@ struct CurrencySelectionView: View {
     }
     
     var autoCurrencyCode: String {
-        Locale.autoupdatingCurrent.currencyCode ?? "USD"
+        Locale.autoupdatingCurrent.currency?.identifier ?? "USD"
     }
     
     var body: some View {

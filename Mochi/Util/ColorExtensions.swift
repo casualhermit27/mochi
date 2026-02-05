@@ -9,7 +9,7 @@ extension Color {
     
     // Pastels
     static let mochiSage = Color(red: 216/255, green: 226/255, blue: 220/255)
-    static let mochiRose = Color(red: 245/255, green: 225/255, blue: 225/255)
+    static let mochiRose = Color(red: 240/255, green: 185/255, blue: 195/255)
     static let mochiBlue = Color(red: 224/255, green: 231/255, blue: 242/255)
     static let mochiBlueDark = Color(red: 160/255, green: 190/255, blue: 230/255)
     

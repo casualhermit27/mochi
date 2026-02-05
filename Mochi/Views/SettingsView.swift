@@ -1,10 +1,11 @@
 import SwiftUI
+import MessageUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var subscription = SubscriptionManager.shared
-    @State private var showPaywall = false
+    @ObservedObject var notificationManager = NotificationManager.shared
     
     // Theme Logic
     var isNightTime: Bool {
@@ -18,12 +19,12 @@ struct SettingsView: View {
         settings.currentPastelTheme
     }
     
-    // Adaptive Colors with Pastel Theme Support
+    // Adaptive Colors
     var dynamicText: Color {
         if settings.colorTheme != "default" {
             return isNightTime ? currentTheme.textDark : currentTheme.text
         }
-        return .primary
+        return isNightTime ? .white : .primary
     }
     
     var dynamicBackground: Color {
@@ -31,51 +32,205 @@ struct SettingsView: View {
         if settings.colorTheme != "default" {
             return isNightTime ? currentTheme.backgroundDark : currentTheme.background
         }
-        return Color(UIColor.systemBackground)
+        return isNightTime ? Color.mochiText : Color.mochiBackground
     }
     
     var accentColor: Color {
         if settings.colorTheme != "default" {
             return currentTheme.accent
         }
-        return Color(red: 0.35, green: 0.65, blue: 0.55)
+        return isNightTime ? Color.mochiBlueDark : Color.mochiRose
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-            // Background - uses pastel theme or system colors
+                dynamicBackground.ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        Text("Settings")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(dynamicText)
+                        Spacer()
+                        Button(action: { 
+                            HapticManager.shared.softSquish()
+                            dismiss() 
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(dynamicText.opacity(0.6))
+                                .frame(width: 32, height: 32)
+                                .background(dynamicText.opacity(0.08))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
+                    .padding(.bottom, 20)
+                    
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 12) {
+                            // 1. Appearance
+                            NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode.capitalized, dynamicText: dynamicText)
+                            }
+                            
+                            // 2. Logging
+                            NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
+                            }
+                            
+                            // 2.1 Data & Export
+                            if subscription.isPro {
+                                NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
+                                }
+                            } else {
+                                Button(action: {
+                                    HapticManager.shared.rigidImpact()
+                                    subscription.showPaywall = true
+                                }) {
+                                    MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
+                                }
+                            }
+                            
+                            
+                            // 3. Notifications
+                            NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                MenuRow(icon: "bell.fill", title: "Notifications", value: settings.dailyNotificationEnabled ? "On" : "Off", dynamicText: dynamicText)
+                            }
+                            
+                            // 4. Feedback
+                            NavigationLink(destination: FeedbackSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                MenuRow(icon: "waveform", title: "Feedback", value: settings.hapticsEnabled ? "On" : "Off", dynamicText: dynamicText)
+                            }
+                            
+                            // 5. About (Separated Rhythm)
+                            NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
+                                MenuRow(icon: "info.circle.fill", title: "About", value: "v1.0.0", dynamicText: dynamicText)
+                            }
+                            .padding(.top, 16) // Extra rhythm separation
+                            
+                            // Footer Anchor
+                            VStack(spacing: 4) {
+                                Text("Mochi")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundColor(dynamicText.opacity(0.15))
+                                Text("v1.0.0")
+                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .foregroundColor(dynamicText.opacity(0.1))
+                            }
+                            .padding(.top, 32)
+                            .padding(.bottom, 24)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+        .sheet(isPresented: $subscription.showPaywall) {
+            PaywallView()
+        }
+        .preferredColorScheme(isNightTime ? .dark : .light)
+    }
+}
+
+// MARK: - Level 1 Components
+
+struct MenuRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    let dynamicText: Color
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(dynamicText.opacity(0.06))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(dynamicText.opacity(0.7))
+            }
+            
+            Text(title)
+                .font(.system(size: 17, weight: .medium, design: .rounded))
+                .foregroundColor(dynamicText)
+            
+            Spacer()
+            
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundColor(dynamicText.opacity(0.4))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(dynamicText.opacity(0.2))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12) // Slightly tighter for grounded feel
+        .background(dynamicText.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+// MARK: - Appearance Settings
+
+struct AppearanceSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+    
+    var accentColor: Color {
+        if settings.colorTheme != "default" {
+            return settings.currentPastelTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+    
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        ZStack {
             dynamicBackground.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
+                // Custom Header
                 HStack {
-                    Text("Settings")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(dynamicText)
-                    Spacer()
-                    Button(action: { 
+                    Button(action: {
                         HapticManager.shared.softSquish()
-                        dismiss() 
+                        dismiss()
                     }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(dynamicText.opacity(0.6))
-                            .frame(width: 30, height: 30)
-                            .background(dynamicText.opacity(0.08))
-                            .clipShape(Circle())
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold)) // Standard back arrow size
+                            .foregroundColor(dynamicText)
+                            .frame(width: 32, height: 32)
                     }
-                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                    
+                    Text("Appearance")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    
+                    Spacer()
+                    
+                    // Balance the header (invisible 32px box)
+                    Color.clear.frame(width: 32, height: 32)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 20)
+                .padding(.top, 16) // Safe area buffer handled by parent view padding or system
+                .padding(.bottom, 12)
                 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        
-                        // 1. Appearance
-                        SettingsSection(icon: "moon.stars.fill", title: "APPEARANCE", textColor: dynamicText) {
+                    VStack(spacing: 32) {
+                        SettingsSection(icon: "moon.stars.fill", title: "THEME", textColor: dynamicText) {
                             HStack(spacing: 0) {
                                 ThemeButton(title: "Auto", mode: "auto", current: settings.themeMode, color: dynamicText, inverseColor: dynamicBackground) {
                                     updateTheme("auto")
@@ -94,7 +249,6 @@ struct SettingsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         
-                        // 1.5 Color Theme
                         SettingsSection(icon: "paintpalette.fill", title: "COLOR THEME", textColor: dynamicText) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -104,53 +258,105 @@ struct SettingsView: View {
                                             isSelected: settings.colorTheme == theme.id,
                                             dynamicText: dynamicText
                                         ) {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                settings.colorTheme = theme.id
+                                            if theme.id == "default" || SubscriptionManager.shared.isPro {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    settings.colorTheme = theme.id
+                                                }
+                                                HapticManager.shared.selection()
+                                            } else {
+                                                HapticManager.shared.rigidImpact()
+                                                SubscriptionManager.shared.showPaywall = true
                                             }
-                                            HapticManager.shared.selection()
                                         }
                                     }
                                 }
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 8)
                             }
-                            
-                            Divider()
-                                .background(dynamicText.opacity(0.1))
-                                .padding(.horizontal, 4)
-                            
+                        }
+                        
+                        SettingsSection(icon: "app.badge.fill", title: "WIDGET", textColor: dynamicText) {
                             Toggle(isOn: $settings.widgetMatchTheme) {
                                 Text("Match Widget Theme")
                                     .font(.system(size: 16, weight: .medium, design: .rounded))
                                     .foregroundColor(dynamicText)
                             }
                             .tint(accentColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 8)
-                            .onChange(of: settings.widgetMatchTheme) { _, newValue in
-                                // Sync to App Group immediately so widget picks it up
-                                if let defaults = UserDefaults(suiteName: "group.com.mochi.spent") {
-                                    defaults.set(newValue, forKey: "widget_match_theme")
-                                    // Reload widget
-                                    if let url = URL(string: "widget-reload://") {
-                                         // Trigger logic if needed, but WidgetCenter is better
-                                        MainContentView.reloadWidget()
-                                    }
-                                }
-                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(dynamicText.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        
-                        // 2. Currency
-                        // 2. Currency
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+    
+    private func updateTheme(_ mode: String) {
+        HapticManager.shared.softSquish()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            settings.themeMode = mode
+        }
+    }
+}
+
+// MARK: - Logging Settings
+
+struct LoggingSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+    
+    var accentColor: Color {
+        if settings.colorTheme != "default" {
+            return settings.currentPastelTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+    
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 32, height: 32)
+                    }
+                    Spacer()
+                    Text("Logging")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
                         SettingsSection(icon: "banknote.fill", title: "CURRENCY", textColor: dynamicText) {
                             NavigationLink(destination: CurrencySelectionView(dynamicText: dynamicText)) {
                                 HStack {
                                     Text(settings.customCurrencyCode.isEmpty ? "Auto" : settings.customCurrencyCode)
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
                                         .foregroundColor(dynamicText)
-                                    
                                     Spacer()
-                                    
                                     HStack(spacing: 4) {
                                         Text(settings.currencySymbol)
                                             .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -165,49 +371,108 @@ struct SettingsView: View {
                                 .background(dynamicText.opacity(0.06))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                            .buttonStyle(.plain)
                         }
                         
-                        // 2.5 Payment Methods
                         SettingsSection(icon: "creditcard.fill", title: "PAYMENT METHODS", textColor: dynamicText) {
                             NavigationLink(destination: PaymentMethodsView(dynamicText: dynamicText)) {
                                 HStack {
                                     HStack(spacing: 10) {
-                                        // Preview card (Flat)
                                         Image(systemName: settings.selectedPaymentMethod.type == .cash ? "banknote" : "creditcard")
                                             .font(.system(size: 14))
                                             .foregroundColor(settings.selectedPaymentMethod.color)
                                             .frame(width: 32, height: 22)
                                             .background(settings.selectedPaymentMethod.color.opacity(0.1))
                                             .clipShape(RoundedRectangle(cornerRadius: 6))
-                                        
                                         Text(settings.selectedPaymentMethod.name)
                                             .font(.system(size: 16, weight: .medium, design: .rounded))
                                             .foregroundColor(dynamicText)
                                     }
-                                    
                                     Spacer()
-                                    
-                                    HStack(spacing: 4) {
-                                        Text("\(settings.paymentMethods.count)")
-                                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundColor(dynamicText.opacity(0.4))
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(dynamicText.opacity(0.3))
-                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(dynamicText.opacity(0.3))
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
                                 .background(dynamicText.opacity(0.06))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                            .buttonStyle(.plain)
                         }
                         
-                        // 3. Notifications
+                        SettingsSection(icon: "sunrise.fill", title: "DAY CYCLE", textColor: dynamicText) {
+                            HStack {
+                                Text("New Day Starts")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                    .foregroundColor(dynamicText)
+                                Spacer()
+                                DatePicker("", selection: $settings.dayStartDate, displayedComponents: .hourAndMinute)
+                                    .labelsHidden()
+                                    .tint(accentColor)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(dynamicText.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+// MARK: - Notification Settings
+
+struct NotificationSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+    
+    var accentColor: Color {
+        if settings.colorTheme != "default" {
+            return settings.currentPastelTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+    
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 32, height: 32)
+                    }
+                    Spacer()
+                    Text("Notifications")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
                         SettingsSection(icon: "bell.badge.fill", title: "NOTIFICATIONS", textColor: dynamicText) {
                             VStack(spacing: 0) {
+                                // Daily Toggle
                                 Toggle(isOn: $settings.dailyNotificationEnabled) {
                                     Text("Daily Summary")
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -217,11 +482,27 @@ struct SettingsView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
                                 
-                                if settings.dailyNotificationEnabled {
+                                Divider()
+                                    .background(dynamicText.opacity(0.1))
+                                    .padding(.horizontal, 16)
+                                
+                                // Weekly Toggle
+                                Toggle(isOn: $settings.weeklyNotificationEnabled) {
+                                    Text("Weekly Summary")
+                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                }
+                                .tint(accentColor)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                
+                                // Shared Time & Day Settings
+                                if settings.dailyNotificationEnabled || settings.weeklyNotificationEnabled {
                                     Divider()
                                         .background(dynamicText.opacity(0.1))
                                         .padding(.horizontal, 16)
                                     
+                                    // Time Picker
                                     HStack {
                                         Text("Time")
                                             .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -233,38 +514,174 @@ struct SettingsView: View {
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 14)
+                                    
+                                    // Day Picker (Weekly Only)
+                                    if settings.weeklyNotificationEnabled {
+                                        Divider()
+                                            .background(dynamicText.opacity(0.1))
+                                            .padding(.horizontal, 16)
+                                        
+                                        HStack {
+                                            Text("Weekly Day")
+                                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                .foregroundColor(dynamicText)
+                                            Spacer()
+                                            Picker("", selection: $settings.weeklyNotificationWeekday) {
+                                                Text("Sun").tag(1)
+                                                Text("Mon").tag(2)
+                                                Text("Tue").tag(3)
+                                                Text("Wed").tag(4)
+                                                Text("Thu").tag(5)
+                                                Text("Fri").tag(6)
+                                                Text("Sat").tag(7)
+                                            }
+                                            .tint(accentColor)
+                                            .labelsHidden()
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 4)
+                                    }
                                 }
                             }
                             .background(dynamicText.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        .onChange(of: settings.dailyNotificationEnabled) { _, enabled in
-                            if enabled {
-                                NotificationManager.shared.requestPermission()
-                            } else {
-                                NotificationManager.shared.scheduleDailyNotification()
-                            }
-                        }
-                        .onChange(of: settings.notificationDate) { _, _ in
-                            NotificationManager.shared.scheduleDailyNotification()
-                        }
                         
-                        // 4. Day Cycle
-                        SettingsSection(icon: "sunrise.fill", title: "DAY CYCLE", textColor: dynamicText) {
-                            SettingsRow(textColor: dynamicText) {
-                                HStack {
-                                    Text("New Day Starts")
-                                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                                        .foregroundColor(dynamicText)
-                                    Spacer()
-                                    DatePicker("", selection: $settings.dayStartDate, displayedComponents: .hourAndMinute)
-                                        .labelsHidden()
-                                        .tint(accentColor)
+                        SettingsSection(icon: "eye.fill", title: "PREVIEW", textColor: dynamicText) {
+                            HStack(spacing: 12) {
+                                // Daily Preview Card
+                                Button(action: {
+                                    HapticManager.shared.softSquish()
+                                    NotificationManager.shared.sendTestNotification(type: .daily)
+                                }) {
+                                    ZStack(alignment: .bottomLeading) {
+                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                            .fill(Color.mochiSage.opacity(isNightTime ? 0.1 : 0.2))
+                                        
+                                        VStack(alignment: .leading, spacing: 0) {
+                                            HStack {
+                                                Image("MochiLogo")
+                                                    .resizable()
+                                                    .frame(width: 28, height: 28)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                Spacer()
+                                                Image(systemName: "sun.max.fill")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(dynamicText.opacity(0.3))
+                                            }
+                                            Spacer()
+                                            Text("DAILY")
+                                                .font(.system(size: 13, weight: .black, design: .monospaced))
+                                                .foregroundColor(dynamicText)
+                                        }
+                                        .padding(14)
+                                    }
+                                    .frame(height: 84)
+                                }
+                                
+                                // Weekly Preview Card
+                                Button(action: {
+                                    HapticManager.shared.softSquish()
+                                    NotificationManager.shared.sendTestNotification(type: .weekly)
+                                }) {
+                                    ZStack(alignment: .bottomLeading) {
+                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                            .fill(Color.mochiBlue.opacity(isNightTime ? 0.1 : 0.2))
+                                        
+                                        VStack(alignment: .leading, spacing: 0) {
+                                            HStack {
+                                                Image("MochiLogo")
+                                                    .resizable()
+                                                    .frame(width: 28, height: 28)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                Spacer()
+                                                Image(systemName: "calendar")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(dynamicText.opacity(0.3))
+                                            }
+                                            Spacer()
+                                            Text("WEEKLY")
+                                                .font(.system(size: 13, weight: .black, design: .monospaced))
+                                                .foregroundColor(dynamicText)
+                                        }
+                                        .padding(14)
+                                    }
+                                    .frame(height: 84)
                                 }
                             }
                         }
-                        
-                        // 5. Haptics & Sounds
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: settings.dailyNotificationEnabled) { _, enabled in
+            if enabled { NotificationManager.shared.requestPermission() }
+            else { NotificationManager.shared.scheduleNotifications() }
+        }
+        .onChange(of: settings.weeklyNotificationEnabled) { _, enabled in
+            if enabled { NotificationManager.shared.requestPermission() }
+            else { NotificationManager.shared.scheduleNotifications() }
+        }
+        .onChange(of: settings.notificationDate) { _, _ in
+            NotificationManager.shared.scheduleNotifications()
+        }
+        .onChange(of: settings.weeklyNotificationWeekday) { _, _ in
+             NotificationManager.shared.scheduleNotifications()
+        }
+    }
+}
+
+// MARK: - Feedback Settings
+
+struct FeedbackSettingsView: View {
+    @State private var showMailView = false
+    @State private var mailResult: Result<MFMailComposeResult, Error>?
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+    
+    var accentColor: Color {
+        if settings.colorTheme != "default" {
+            return settings.currentPastelTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+    
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 32, height: 32)
+                    }
+                    Spacer()
+                    Text("Feedback")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
                         SettingsSection(icon: "waveform", title: "FEEDBACK", textColor: dynamicText) {
                             VStack(spacing: 0) {
                                 Toggle(isOn: $settings.hapticsEnabled) {
@@ -303,131 +720,217 @@ struct SettingsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         
-                        // 6. Mochi+ Subscription
-                        if !subscription.isPro {
+                        SettingsSection(icon: "envelope.fill", title: "CONTACT", textColor: dynamicText) {
                             Button(action: {
-                                HapticManager.shared.softSquish()
-                                showPaywall = true
+                                HapticManager.shared.rigidImpact()
+                                if MFMailComposeViewController.canSendMail() {
+                                    showMailView = true
+                                } else {
+                                    if let url = URL(string: "mailto:harshachaganti12@gmail.com?subject=Mochi%20App%20Feedback") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }
                             }) {
-                                HStack(spacing: 10) {
-                                    HStack(alignment: .center, spacing: 2) {
-                                        Image("MochiLogo")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 38, height: 38)
-                                            .clipShape(RoundedRectangle(cornerRadius: 9))
-                                        Text("+")
-                                            .font(.system(size: 20, weight: .medium, design: .rounded))
-                                            .foregroundColor(Color(red: 0.35, green: 0.65, blue: 0.55))
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(accentColor.opacity(0.1))
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: "paperplane.fill")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(accentColor)
                                     }
                                     
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        HStack(spacing: 6) {
-                                            Text("Upgrade")
-                                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                            
-                                            if subscription.isTrialActive {
-                                                Text("\(subscription.trialDaysRemaining) DAYS LEFT")
-                                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                                    .foregroundColor(.white)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 3)
-                                                    .background(Color(red: 0.35, green: 0.65, blue: 0.55))
-                                                    .clipShape(Capsule())
-                                            }
-                                        }
-                                        Text("Unlock History, Themes, Export & Widget")
-                                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                                            .opacity(0.6)
-                                    }
+                                    Text("Send Suggestions")
+                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText)
                                     
                                     Spacer()
                                     
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .opacity(0.4)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(dynamicText.opacity(0.3))
                                 }
-                                .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
-                                .padding(14)
-                                .background(Color(red: 0.98, green: 0.96, blue: 0.93))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.28).opacity(0.08), radius: 8, y: 4)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 8)
-                        } else {
-                            // Pro Badge
-                            HStack(spacing: 8) {
-                                HStack(spacing: 2) {
-                                    Image("MochiLogo")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 30, height: 30)
-                                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                                    Text("+")
-                                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                                        .foregroundColor(Color(red: 0.35, green: 0.65, blue: 0.55))
-                                }
-                                Text("Active")
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color(red: 0.98, green: 0.96, blue: 0.93))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.28).opacity(0.06), radius: 6, y: 3)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 8)
                         }
-                        
-                        // Restore Purchase
-                        Button(action: {
-                            HapticManager.shared.softSquish()
-                            Task {
-                                await subscription.restorePurchases()
-                            }
-                        }) {
-                            Text("Restore Purchase")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundColor(dynamicText.opacity(0.5))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 8)
-                        
-                        // Footer
-                        VStack(spacing: 4) {
-                            Text("Mochi")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundColor(dynamicText.opacity(0.3))
-                            Text("v1.0.0")
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundColor(dynamicText.opacity(0.2))
-                        }
-                        .padding(.top, 16)
-                        .padding(.bottom, 32)
                     }
+                    .padding(.top, 12)
                 }
             }
-            }
-            .toolbar(.hidden, for: .navigationBar)
         }
-        .preferredColorScheme(isNightTime ? .dark : .light)
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-        }
-    }
-    
-    private func updateTheme(_ mode: String) {
-        HapticManager.shared.softSquish()
-        withAnimation(.easeInOut(duration: 0.2)) {
-            settings.themeMode = mode
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showMailView) {
+            MailView(result: $mailResult)
+                .ignoresSafeArea()
         }
     }
 }
 
-// MARK: - Reusable Components
+// MARK: - About Settings
+
+struct AboutSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let accentColor: Color
+    let isNightTime: Bool
+    
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 32, height: 32)
+                    }
+                    Spacer()
+                    Text("About")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        // Mochi+ Status
+                        SettingsSection(icon: "sparkles", title: "SUBSCRIPTION", textColor: dynamicText) {
+                            if !subscription.isPro {
+                                Button(action: { subscription.showPaywall = true }) {
+                                    UpgradePromoView(subscription: subscription)
+                                }
+                            } else {
+                                Button(action: { 
+                                    HapticManager.shared.softSquish()
+                                    subscription.showCustomerCenter = true 
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image("MochiLogo")
+                                            .resizable()
+                                            .frame(width: 30, height: 30)
+                                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                                        Text("Mochi+ Active")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
+                                        Spacer()
+                                        Image(systemName: "person.circle.fill")
+                                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28).opacity(0.4))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(Color(red: 0.98, green: 0.96, blue: 0.93))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+                            }
+                        }
+                        
+                        SettingsSection(icon: "info.circle.fill", title: "ABOUT", textColor: dynamicText) {
+                            VStack(spacing: 0) {
+                                HStack {
+                                    Text("Restore Purchase")
+                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                    Spacer()
+                                    Button("Restore") {
+                                        Task { await subscription.restorePurchases() }
+                                    }
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundColor(dynamicText.opacity(0.5))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                
+                                Divider().background(dynamicText.opacity(0.1)).padding(.horizontal, 16)
+                                
+                                HStack {
+                                    Text("Version")
+                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                    Spacer()
+                                    Text("1.0.0")
+                                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                        .foregroundColor(dynamicText.opacity(0.4))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                            }
+                            .background(dynamicText.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        
+                        // Debug Section (Pro Toggle)
+                        #if DEBUG
+                        SettingsSection(icon: "hammer.fill", title: "DEBUG", textColor: dynamicText) {
+                            Toggle(isOn: $subscription.debugForcedPro) {
+                                Text("Force Mochi +")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                    .foregroundColor(dynamicText)
+                            }
+                            .tint(accentColor)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(dynamicText.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        #endif
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $subscription.showPaywall) { PaywallView() }
+    }
+}
+
+struct UpgradePromoView: View {
+    @ObservedObject var subscription: SubscriptionManager
+    var body: some View {
+        HStack(spacing: 12) {
+            Image("MochiLogo")
+                .resizable()
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Upgrade to Mochi+")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                Text("Unlock history, themes & widgets")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .opacity(0.6)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).opacity(0.4)
+        }
+        .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
+        .padding(16)
+        .background(Color(red: 0.98, green: 0.96, blue: 0.93))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+// MARK: - Reusable Components (Keep existing designs)
 
 struct SettingsSection<Content: View>: View {
     let icon: String
@@ -447,23 +950,9 @@ struct SettingsSection<Content: View>: View {
                     .tracking(1.2)
             }
             .padding(.leading, 4)
-            
             content
         }
         .padding(.horizontal, 24)
-    }
-}
-
-struct SettingsRow<Content: View>: View {
-    let textColor: Color
-    @ViewBuilder let content: Content
-    
-    var body: some View {
-        content
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(textColor.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -474,9 +963,7 @@ struct ThemeButton: View {
     let color: Color
     let inverseColor: Color
     let action: () -> Void
-    
     var isSelected: Bool { mode == current }
-    
     var body: some View {
         Button(action: action) {
             Text(title)
@@ -485,7 +972,6 @@ struct ThemeButton: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(isSelected ? color : Color.clear)
-                .animation(.easeInOut(duration: 0.15), value: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -496,36 +982,17 @@ struct ColorThemeButton: View {
     let isSelected: Bool
     let dynamicText: Color
     let action: () -> Void
-    
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 ZStack {
-                    // Simple solid pastel background
-                    Circle()
-                        .fill(theme.background)
-                        .frame(width: 50, height: 50)
-                    
-                    // Colored icon matching theme accent
-                    Image(systemName: theme.icon)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(theme.accent)
-                    
-                    // Selection ring
-                    if isSelected {
-                        Circle()
-                            .stroke(dynamicText, lineWidth: 2)
-                            .frame(width: 54, height: 54)
-                    }
+                    Circle().fill(theme.background).frame(width: 50, height: 50)
+                    Image(systemName: theme.icon).font(.system(size: 16, weight: .medium)).foregroundColor(theme.accent)
+                    if isSelected { Circle().stroke(dynamicText, lineWidth: 2).frame(width: 54, height: 54) }
                 }
-                
-                Text(theme.name)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded))
-                    .foregroundColor(isSelected ? dynamicText : dynamicText.opacity(0.5))
+                Text(theme.name).font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded)).foregroundColor(isSelected ? dynamicText : dynamicText.opacity(0.5))
             }
         }
         .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.05 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }

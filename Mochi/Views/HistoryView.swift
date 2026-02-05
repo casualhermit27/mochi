@@ -9,6 +9,8 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
     @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var notificationManager = NotificationManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
     @Binding var sessionDeletedAmount: Double
     
     @State private var taggingItem: Item? = nil
@@ -69,6 +71,15 @@ struct HistoryView: View {
     
     @State private var expandedDays: Set<Date> = []
     
+    // Search & Filter State
+    @State private var searchText = ""
+    @State private var searchStartDate: Date? = nil
+    @State private var searchEndDate: Date? = nil
+    @State private var showSearchDatePicker = false
+    @State private var isSearchActive = false
+    @FocusState private var isSearchFocused: Bool
+    @Namespace private var searchAnimation
+    
     // Selection & Bulk Delete State
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<PersistentIdentifier> = []
@@ -79,7 +90,7 @@ struct HistoryView: View {
     
     // Drag-to-Select State
     @State private var isDragging = false
-    @State private var dragSelectMode: Bool? = nil // nil = not set, true = selecting, false = deselecting
+    @State private var dragSelectMode: Bool? = nil 
     
     struct SnapshotItem {
         let amount: Double
@@ -88,8 +99,70 @@ struct HistoryView: View {
         let paymentMethodId: String?
     }
     
+    var hasDateFilter: Bool {
+        searchStartDate != nil || searchEndDate != nil
+    }
+    
+    var dateFilterLabel: String {
+        if let start = searchStartDate, let end = searchEndDate {
+            if Calendar.current.isDate(start, inSameDayAs: end) {
+                return start.formatted(.dateTime.day().month())
+            }
+            return "\(start.formatted(.dateTime.day().month())) – \(end.formatted(.dateTime.day().month()))"
+        } else if let start = searchStartDate {
+            return "From \(start.formatted(.dateTime.day().month()))"
+        } else if let end = searchEndDate {
+            return "To \(end.formatted(.dateTime.day().month()))"
+        }
+        return "Date"
+    }
+    
+    var filteredItems: [Item] {
+        if searchText.isEmpty && !hasDateFilter {
+            return items
+        }
+        
+        return items.filter { item in
+            var matches = true
+            
+            // Text Search (Note, Amount, Payment Method)
+            if !searchText.isEmpty {
+                let query = searchText.localizedLowercase
+                let noteMatch = item.note?.localizedLowercase.contains(query) ?? false
+                let amountMatch = String(format: "%.0f", item.amount).contains(query)
+                
+                var methodMatch = false
+                if let methodId = item.paymentMethodId,
+                   let method = settings.getPaymentMethod(by: methodId) {
+                    methodMatch = method.name.localizedLowercase.contains(query)
+                }
+                
+                if !(noteMatch || amountMatch || methodMatch) {
+                    matches = false
+                }
+            }
+            
+            // Date Range Filter
+            if let start = searchStartDate {
+                if item.timestamp < Calendar.current.startOfDay(for: start) {
+                    matches = false
+                }
+            }
+            if let end = searchEndDate {
+                // End of day for end date
+                if let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: end)) {
+                    if item.timestamp >= endOfDay {
+                        matches = false
+                    }
+                }
+            }
+            
+            return matches
+        }
+    }
+    
     var groupedItems: [Date: [Item]] {
-        Dictionary(grouping: items) { item in
+        Dictionary(grouping: filteredItems) { item in
             settings.getRitualDay(for: item.timestamp)
         }
     }
@@ -107,31 +180,48 @@ struct HistoryView: View {
                         // Calculate Day Total
                         let dayItems = groupedItems[date] ?? []
                         let dayTotal = dayItems.reduce(0) { $0 + $1.amount }
-                        let isExpanded = expandedDays.contains(date)
+                         // If searching, always expand
+                        let isExpanded = (!searchText.isEmpty || hasDateFilter) ? true : expandedDays.contains(date)
                         
                         // Custom Section Header with Disclosure Logic
                          Section {
                             if isExpanded {
                                 let isOld = isDateLocked(date)
                                 
-                                if isOld {
+                                if isOld && !SubscriptionManager.shared.isPro {
                                     // Locked Entry
-                                    HStack {
-                                        Text("History Locked")
-                                        Spacer()
-                                        Image(systemName: "lock.fill")
-                                        Text("$1.99")
+                                    VStack(spacing: 12) {
+                                        HStack {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 14))
+                                            Text("History Locked")
+                                                .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                            Spacer()
+                                            Text("Mochi +")
+                                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(dynamicText.opacity(0.1))
+                                                .clipShape(Capsule())
+                                        }
+                                        .foregroundColor(dynamicSecondary)
+                                        .blur(radius: 1.5)
+                                        
+                                        Button(action: {
+                                            HapticManager.shared.rigidImpact()
+                                            subscription.showPaywall = true
+                                        }) {
+                                            Text("Unlock Full History")
+                                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                                .foregroundColor(dynamicBackground)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 12)
+                                                .background(dynamicText)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
                                     }
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundColor(dynamicSecondary)
-                                    .padding(.vertical, 8)
-                                    .blur(radius: 3)
-                                    .overlay {
-                                        Button("Unlock") { }
-                                            .buttonStyle(.borderedProminent)
-                                            .tint(dynamicText)
-                                            .foregroundColor(dynamicBackground)
-                                    }
+                                    .padding(.vertical, 16)
+                                    .padding(.horizontal, 4)
                                 } else {
                                     // Unlocked entries
                                     ForEach(dayItems) { item in
@@ -430,6 +520,175 @@ struct HistoryView: View {
                     }
                     .zIndex(102)
                 }
+                
+                // Bottom Search Bar (Glassmorphic)
+                if !isSelectionMode && taggingItem == nil && !showUndoToast {
+                    VStack {
+                        Spacer()
+                        
+                        if isSearchActive {
+                            // Expanded Search View
+                            VStack(spacing: 12) {
+                                // Quick Filters Row
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        // Today
+                                        QuickFilterPill(
+                                            label: "Today",
+                                            isActive: isQuickFilter(.today),
+                                            accentColor: accentColor,
+                                            textColor: dynamicText,
+                                            secondaryColor: dynamicSecondary
+                                        ) {
+                                            applyQuickFilter(.today)
+                                        }
+                                        
+                                        // This Week
+                                        QuickFilterPill(
+                                            label: "This Week",
+                                            isActive: isQuickFilter(.thisWeek),
+                                            accentColor: accentColor,
+                                            textColor: dynamicText,
+                                            secondaryColor: dynamicSecondary
+                                        ) {
+                                            applyQuickFilter(.thisWeek)
+                                        }
+                                        
+                                        // Last 30 Days
+                                        QuickFilterPill(
+                                            label: "Last 30 Days",
+                                            isActive: isQuickFilter(.last30Days),
+                                            accentColor: accentColor,
+                                            textColor: dynamicText,
+                                            secondaryColor: dynamicSecondary
+                                        ) {
+                                            applyQuickFilter(.last30Days)
+                                        }
+                                        
+                                        // Last 2 Months
+                                        QuickFilterPill(
+                                            label: "Last 2 Months",
+                                            isActive: isQuickFilter(.last2Months),
+                                            accentColor: accentColor,
+                                            textColor: dynamicText,
+                                            secondaryColor: dynamicSecondary
+                                        ) {
+                                            applyQuickFilter(.last2Months)
+                                        }
+                                        
+                                        // Custom Date Range
+                                        Button(action: { showSearchDatePicker = true }) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "calendar")
+                                                    .font(.system(size: 11, weight: .medium))
+                                                Text(hasDateFilter ? dateFilterLabel : "Custom")
+                                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                                if hasDateFilter {
+                                                    Button(action: { clearDateFilter() }) {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .font(.system(size: 11))
+                                                            .foregroundColor(dynamicSecondary)
+                                                    }
+                                                }
+                                            }
+                                            .padding(.vertical, 8)
+                                            .padding(.horizontal, 12)
+                                            .background(hasDateFilter ? accentColor.opacity(0.2) : dynamicText.opacity(0.08))
+                                            .foregroundColor(hasDateFilter ? accentColor : dynamicSecondary)
+                                            .clipShape(Capsule())
+                                        }
+                                    }
+                                }
+                                
+                                // Search Input + Close
+                                HStack(spacing: 12) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(dynamicSecondary)
+                                    
+                                    TextField("", text: $searchText, prompt: Text("Search notes, amount, tag...").foregroundColor(dynamicSecondary.opacity(0.6)))
+                                        .font(.system(size: 16, design: .monospaced))
+                                        .foregroundColor(dynamicText)
+                                        .focused($isSearchFocused)
+                                    
+                                    if !searchText.isEmpty {
+                                        Button(action: { searchText = "" }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(dynamicSecondary)
+                                        }
+                                    }
+                                    
+                                    // Close Search
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
+                                            isSearchActive = false
+                                            isSearchFocused = false
+                                            searchText = ""
+                                            clearDateFilter()
+                                        }
+                                    }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(dynamicSecondary)
+                                            .padding(8)
+                                            .background(dynamicText.opacity(0.08))
+                                            .clipShape(Circle())
+                                    }
+                                }
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 16)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .fill(dynamicBackground.opacity(0.95))
+                                    .shadow(color: dynamicText.opacity(isNightTime ? 0.15 : 0.08), radius: 20, y: -5)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .stroke(dynamicText.opacity(0.06), lineWidth: 1)
+                            )
+                            .matchedGeometryEffect(id: "searchContainer", in: searchAnimation)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                        } else {
+                            // Collapsed Search Button
+                            Button(action: {
+                                withAnimation(.spring(response: 0.55, dampingFraction: 0.85, blendDuration: 0.1)) {
+                                    isSearchActive = true
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    isSearchFocused = true
+                                }
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 14, weight: .medium))
+                                    Text("Search")
+                                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                }
+                                .foregroundColor(dynamicSecondary)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 20)
+                                .background(
+                                    Capsule()
+                                        .fill(dynamicBackground.opacity(0.95))
+                                        .shadow(color: dynamicText.opacity(isNightTime ? 0.1 : 0.06), radius: 10, y: 2)
+                                        .matchedGeometryEffect(id: "searchContainer", in: searchAnimation)
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(dynamicText.opacity(0.06), lineWidth: 1)
+                                )
+                            }
+                            .padding(.bottom, 16)
+                        }
+                    }
+                    .zIndex(103)
+                }
             }
             .navigationTitle("Mochi")
             .navigationBarTitleDisplayMode(.inline)
@@ -480,12 +739,141 @@ struct HistoryView: View {
                     .presentationBackground(.regularMaterial)
                     .presentationCornerRadius(32)
             }
+
+            .sheet(isPresented: $showSearchDatePicker) {
+                VStack(spacing: 16) {
+                    // Drag Indicator
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(dynamicSecondary.opacity(0.3))
+                        .frame(width: 36, height: 5)
+                        .padding(.top, 10)
+                    
+                    Text("Select Date Range")
+                        .font(.system(.headline, design: .monospaced))
+                        .padding(.top, 8)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("From")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(dynamicSecondary)
+                        
+                        DatePicker("", selection: Binding(
+                            get: { searchStartDate ?? Date() },
+                            set: { searchStartDate = $0 }
+                        ), displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(accentColor)
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("To")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(dynamicSecondary)
+                        
+                        DatePicker("", selection: Binding(
+                            get: { searchEndDate ?? Date() },
+                            set: { searchEndDate = $0 }
+                        ), displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(accentColor)
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    Spacer()
+                    
+                    Button {
+                        showSearchDatePicker = false
+                    } label: {
+                        Text("Apply Range")
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(accentColor)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 20)
+                }
+                .presentationDetents([.fraction(0.42)])
+                .presentationCornerRadius(32)
+                .presentationBackground(.regularMaterial)
+                .presentationDragIndicator(.hidden)
+            }
+            .sheet(isPresented: $subscription.showPaywall) {
+                PaywallView()
+            }
+            .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
+                if shouldDismiss {
+                    showSettings = false
+                    showSearchDatePicker = false
+                    dismiss()
+                }
+            }
         }
     }
     
     func isDateLocked(_ date: Date) -> Bool {
         let threeDaysAgo = Calendar.current.date(byAdding: .day, value: -3, to: Date())!
         return date < Calendar.current.startOfDay(for: threeDaysAgo)
+    }
+    
+    // MARK: - Quick Filters
+    
+    enum QuickFilter {
+        case today, thisWeek, last30Days, last2Months
+    }
+    
+    private func clearDateFilter() {
+        searchStartDate = nil
+        searchEndDate = nil
+    }
+    
+    private func applyQuickFilter(_ filter: QuickFilter) {
+        HapticManager.shared.lightImpact()
+        let calendar = Calendar.current
+        let today = Date()
+        
+        switch filter {
+        case .today:
+            searchStartDate = calendar.startOfDay(for: today)
+            searchEndDate = today
+        case .thisWeek:
+            if let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start {
+                searchStartDate = weekStart
+                searchEndDate = today
+            }
+        case .last30Days:
+            searchStartDate = calendar.date(byAdding: .day, value: -30, to: today)
+            searchEndDate = today
+        case .last2Months:
+            searchStartDate = calendar.date(byAdding: .month, value: -2, to: today)
+            searchEndDate = today
+        }
+    }
+    
+    private func isQuickFilter(_ filter: QuickFilter) -> Bool {
+        guard let start = searchStartDate, let end = searchEndDate else { return false }
+        let calendar = Calendar.current
+        let today = Date()
+        
+        switch filter {
+        case .today:
+            return calendar.isDateInToday(start) && calendar.isDateInToday(end)
+        case .thisWeek:
+            guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start else { return false }
+            return calendar.isDate(start, inSameDayAs: weekStart) && calendar.isDateInToday(end)
+        case .last30Days:
+            guard let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today) else { return false }
+            return calendar.isDate(start, inSameDayAs: thirtyDaysAgo) && calendar.isDateInToday(end)
+        case .last2Months:
+            guard let twoMonthsAgo = calendar.date(byAdding: .month, value: -2, to: today) else { return false }
+            return calendar.isDate(start, inSameDayAs: twoMonthsAgo) && calendar.isDateInToday(end)
+        }
     }
     
     // MARK: - Deletion Logic
@@ -501,14 +889,14 @@ struct HistoryView: View {
     private func undoPendingDeletion(_ item: Item) {
         HapticManager.shared.success()
         withAnimation {
-            pendingDeletions.removeValue(forKey: item.persistentModelID)
+            _ = pendingDeletions.removeValue(forKey: item.persistentModelID)
         }
     }
     
     private func confirmDeletion(_ item: Item) {
         withAnimation {
             if pendingDeletions[item.persistentModelID] != nil {
-                pendingDeletions.removeValue(forKey: item.persistentModelID)
+                _ = pendingDeletions.removeValue(forKey: item.persistentModelID)
                 sessionDeletedAmount += item.amount
                 
                 // Update Widget specifically for deletion
@@ -519,7 +907,8 @@ struct HistoryView: View {
                     lastTransactionNote: "",
                     currencySymbol: settings.currencySymbol,
                     colorTheme: settings.colorTheme,
-                    themeMode: settings.themeMode
+                    themeMode: settings.themeMode,
+                    isPro: SubscriptionManager.shared.isPro
                 )
                 // Note: MainView will follow up with correct Totals due to items.count change
                 
@@ -557,6 +946,7 @@ struct HistoryView: View {
     private func saveTag() {
         if let item = taggingItem {
             item.note = tagText
+
             HapticManager.shared.success()
         }
         withAnimation {
@@ -630,7 +1020,8 @@ struct HistoryView: View {
             lastTransactionNote: "",
             currencySymbol: settings.currencySymbol,
             colorTheme: settings.colorTheme,
-            themeMode: settings.themeMode
+            themeMode: settings.themeMode,
+            isPro: SubscriptionManager.shared.isPro
         )
         
         // Reset Selection
@@ -719,16 +1110,14 @@ struct UndoRowView: View {
                         ZStack {
                             // Timer Ring
                             Circle()
-                                .stroke(isNightTime ? Color.white.opacity(0.2) : Color.black.opacity(0.1), lineWidth: 3)
-                            
-                            Circle()
                                 .trim(from: 0, to: progress)
                                 .stroke(isNightTime ? Color.mochiRose : Color.mochiText, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
                                 
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(isNightTime ? .white.opacity(0.8) : .black.opacity(0.6))
+                            Text("\(Int(ceil(remaining)))")
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundColor(isNightTime ? .white : .black)
+                                .contentTransition(.numericText())
                         }
                         .frame(width: 32, height: 32)
                         .contentShape(Circle())
@@ -738,6 +1127,29 @@ struct UndoRowView: View {
                 .padding(.vertical, 6)
             }
             .id("undo_row")
+        }
+    }
+}
+
+// MARK: - Quick Filter Pill Component
+
+struct QuickFilterPill: View {
+    let label: String
+    let isActive: Bool
+    let accentColor: Color
+    let textColor: Color
+    let secondaryColor: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(isActive ? accentColor.opacity(0.2) : textColor.opacity(0.08))
+                .foregroundColor(isActive ? accentColor : secondaryColor)
+                .clipShape(Capsule())
         }
     }
 }
