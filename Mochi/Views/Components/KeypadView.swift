@@ -2,7 +2,8 @@ import SwiftUI
 
 struct KeypadView: View {
     let onTap: (String) -> Void
-    var textColor: Color // Added support for dynamic color
+    var onLongPress: ((String) -> Void)? = nil // NEW: Long press callback
+    var textColor: Color 
     
     let columns = [
         GridItem(.flexible()),
@@ -13,15 +14,15 @@ struct KeypadView: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 20) {
             ForEach(1...9, id: \.self) { num in
-                KeypadButton(text: "\(num)", onTap: onTap, color: textColor)
+                KeypadButton(text: "\(num)", onTap: onTap, onLongPress: onLongPress, color: textColor)
             }
             
             // Bottom row
-            KeypadButton(text: ".", onTap: onTap, color: textColor)
-            KeypadButton(text: "0", onTap: onTap, color: textColor)
+            KeypadButton(text: ".", onTap: onTap, onLongPress: nil, color: textColor)
+            KeypadButton(text: "0", onTap: onTap, onLongPress: nil, color: textColor)
             
             // Backspace with repeat logic
-            KeypadButton(text: "backspace", onTap: onTap, color: textColor, isBackspace: true)
+            KeypadButton(text: "backspace", onTap: onTap, onLongPress: nil, color: textColor, isBackspace: true)
             .buttonStyle(SquishyButtonStyle())
         }
         .padding(.horizontal, 40)
@@ -31,30 +32,67 @@ struct KeypadView: View {
 struct KeypadButton: View {
     let text: String
     let onTap: (String) -> Void
+    var onLongPress: ((String) -> Void)? // NEW
     var color: Color
     var isBackspace: Bool = false
     
-    @State private var timer: Timer?
-    @State private var isLongPressing = false
+    @State private var pressStartTime: Date?
+    @State private var timer: Timer?            // Restored
+    @State private var isLongPressing = false   // Restored
     
     var body: some View {
-        if isBackspace {
-            // Backspace: Gesture-based for repeating delete
-            let pressGesture = DragGesture(minimumDistance: 0)
+        ZStack {
+            // Background & Touch Target
+            Circle()
+                .fill(Color.gray.opacity(isLongPressing ? 0.2 : 0.001))
+                .frame(width: 80, height: 80)
+            
+            if isBackspace {
+                Image(systemName: "delete.left")
+                    .font(.title2)
+                    .foregroundColor(color)
+                    .opacity(isLongPressing ? 0.8 : 1.0)
+            } else {
+                Text(text)
+                    .font(.system(size: 32, weight: .medium, design: .monospaced))
+                    .foregroundColor(color)
+            }
+        }
+        .contentShape(Circle()) // Helper for hit testing
+        .scaleEffect(isLongPressing ? 0.9 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLongPressing)
+        // Unified Gesture Logic
+        .gesture(
+            DragGesture(minimumDistance: 0)
                 .onChanged { _ in
                     if !isLongPressing {
                         isLongPressing = true
-                        // Initial tap
-                        HapticManager.shared.lightImpact()
-                        onTap(text)
+                        pressStartTime = Date()
                         
-                        // Delay before rapid fire
-                        timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { _ in
-                            // Start rapid fire
-                            timer?.invalidate()
-                            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                                HapticManager.shared.lightImpact()
-                                onTap(text)
+                        if isBackspace {
+                            // Backspace Immediate Trigger
+                            HapticManager.shared.lightImpact()
+                            onTap(text)
+                            
+                            // Repeat Logic for Backspace
+                            timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { _ in
+                                timer?.invalidate()
+                                timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                                    HapticManager.shared.lightImpact()
+                                    onTap(text)
+                                }
+                            }
+                        } else {
+                            // Standard Key: Wait for long press threshold
+                            if let onLongPress = onLongPress {
+                                timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                                    // Long Press Triggered
+                                    onLongPress(text)
+                                    timer?.invalidate()
+                                    timer = nil
+                                    // Prevent tap on release by invalidating start time (optional flag check)
+                                    pressStartTime = nil 
+                                }
                             }
                         }
                     }
@@ -63,36 +101,17 @@ struct KeypadButton: View {
                     isLongPressing = false
                     timer?.invalidate()
                     timer = nil
+                    
+                    // Tap Logic (Only if not backspace, as backspace handles on changed)
+                    if !isBackspace {
+                         // Check if it was a short tap (pressStartTime is non-nil means timer didn't fire long press yet)
+                        if let start = pressStartTime {
+                             onTap(text)
+                        }
+                    }
+                    pressStartTime = nil
                 }
-            
-            ZStack {
-                // Background for touch target (Visual feedback)
-                Circle()
-                    .fill(Color.gray.opacity(isLongPressing ? 0.2 : 0.001))
-                
-                Image(systemName: "delete.left")
-                    .font(.title2)
-                    .foregroundColor(color)
-                    .opacity(isLongPressing ? 0.8 : 1.0)
-            }
-            .frame(width: 80, height: 80)
-            .contentShape(Circle()) // Increases touch area
-            .simultaneousGesture(pressGesture)
-            .scaleEffect(isLongPressing ? 0.9 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLongPressing)
-            
-        } else {
-            // Standard Keys: Button-based (tap on release)
-            Button(action: { onTap(text) }) {
-                Text(text)
-                    .font(.system(size: 32, weight: .medium, design: .monospaced))
-                    .foregroundColor(color)
-                    .frame(width: 80, height: 80)
-                    .background(Color.clear)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(SquishyButtonStyle())
-        }
+        )
     }
 }
 

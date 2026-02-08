@@ -8,7 +8,7 @@ class SubscriptionManager: NSObject, ObservableObject {
     static let shared = SubscriptionManager()
     
     // RevenueCat Configuration
-    private static let apiKey = "test_IpXeBAMMrCNetOFBuQQUPEsQMsL"
+    private static let apiKey = "appl_IzgFGpKnIBDJhCTKGzmyryLRegh"
     private static let entitlementID = "Mochi +"
     
     // Published state
@@ -186,16 +186,16 @@ struct SubscriptionPlan: Identifiable {
     static let yearly = SubscriptionPlan(
         id: "yearly",
         name: "Yearly",
-        price: "$30.99",
+        price: "$19.99",
         period: "/year",
-        badge: "BEST VALUE",
-        savings: "Save 14%"
+        badge: "BEST DEAL",
+        savings: "Save 44%"
     )
     
     static let lifetime = SubscriptionPlan(
         id: "lifetime",
         name: "Lifetime",
-        price: "$49.99",
+        price: "$39.99",
         period: "once",
         badge: "FOREVER",
         savings: "Pay once, own forever"

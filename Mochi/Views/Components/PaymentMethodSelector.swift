@@ -127,23 +127,25 @@ struct PaymentMethodDialItem: View {
 // MARK: - Compact Badge (For History)
 
 struct CompactPaymentBadge: View {
-    let method: PaymentMethod?
+    let method: PaymentMethod
     let dynamicText: Color
     
     var body: some View {
-        if let method = method {
-            HStack(spacing: 4) {
-                Image(systemName: method.type == .cash ? "banknote" : "creditcard")
-                    .font(.system(size: 9))
-                Text(method.name)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-            }
-            .foregroundColor(method.color.opacity(0.8))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(method.color.opacity(0.1))
-            .clipShape(Capsule())
+        HStack(spacing: 4) {
+            Image(systemName: method.type == .cash ? "banknote" : "creditcard")
+                .font(.system(size: 9, weight: .bold))
+            Text(method.name)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
         }
+        .foregroundColor(method.color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(method.color.opacity(0.12))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(method.color.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

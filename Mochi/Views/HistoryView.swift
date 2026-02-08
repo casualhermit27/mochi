@@ -764,7 +764,8 @@ struct HistoryView: View {
                         .datePickerStyle(.compact)
                         .labelsHidden()
                         .tint(accentColor)
-                    }
+
+}
                     .padding(.horizontal, 24)
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -989,6 +990,8 @@ struct HistoryView: View {
     
     // MARK: - Bulk Deletion
     
+
+
     private func executeBulkDelete() {
         HapticManager.shared.rigidImpact()
         

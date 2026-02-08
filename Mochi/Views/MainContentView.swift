@@ -205,6 +205,7 @@ struct MainContentView: View {
                             .padding(.trailing, 24)
                             .padding(.vertical, 8)
                     }
+                    .disabled(isTrialOver)
                 }
                 .padding(.top, 10)
                 
@@ -281,7 +282,7 @@ struct MainContentView: View {
                 }
                 
                 // Keypad
-                KeypadView(onTap: handleKeypadInput, textColor: dynamicText)
+                KeypadView(onTap: handleKeypadInput, onLongPress: handleKeypadLongPress, textColor: dynamicText)
                     .padding(.bottom, 20)
                 
                 // Done Button
@@ -306,6 +307,7 @@ struct MainContentView: View {
                     isNightTime: isNightTime
                 )
                 .transition(.opacity.combined(with: .scale(scale: 1.1)))
+                .zIndex(999) // Ensure it's on top of everything
             }
             
             // Toast
@@ -326,7 +328,7 @@ struct MainContentView: View {
                 .zIndex(100)
             }
         }
-        .simultaneousGesture(dragGesture)
+        .simultaneousGesture(isTrialOver ? nil : dragGesture)
         .sheet(isPresented: $showHistory) {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
@@ -439,6 +441,64 @@ struct MainContentView: View {
 
     }
     
+
+    
+    // MARK: - Speed Dial Logic
+    
+    private func handleKeypadLongPress(_ key: String) {
+        guard let num = Int(key), let preset = settings.speedDialPresets[num] else {
+            // Error Haptic if no preset
+            HapticManager.shared.softSquish()
+            return
+        }
+        
+        // Instant Add
+        // Just use the label, no icon in history (User request)
+        let note = preset.label
+        instantAdd(amount: preset.amount, note: note)
+    }
+    
+    private func instantAdd(amount: Double, note: String) {
+        HapticManager.shared.rigidImpact()
+        
+        let methodId = settings.selectedPaymentMethod.id.uuidString
+        let newItem = Item(timestamp: Date(), amount: amount, note: note, paymentMethodId: methodId)
+        modelContext.insert(newItem)
+        
+        // Update Undo State
+        lastAddedItem = newItem
+        lastAddedTime = Date()
+        
+        // Show Animation
+        addedAmount = amount
+        isNegativeDelta = false
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            showAddedAnimation = true
+        }
+        
+        // Show Toast
+        toastMessage = "Added \(note)"
+        withAnimation {
+            showToast = true
+        }
+        
+        // Haptic Feedback for Success
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            HapticManager.shared.success()
+        }
+        
+        // Reset Input just in case they were typing
+        withAnimation {
+            isInputActive = false
+            currentInput = "0"
+        }
+        
+        // Hide Animation after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation { showAddedAnimation = false; showToast = false }
+        }
+    }
+    
     private func saveEntry() {
         guard let amount = Double(currentInput), amount > 0 else {
             // Error Wiggle
@@ -542,75 +602,216 @@ struct TrialCompletedOverlay: View {
     let accentColor: Color
     let isNightTime: Bool
     
+    @State private var animateContent = false
+    
     var body: some View {
         ZStack {
+            // Background with subtle gradient
             dynamicBackground.ignoresSafeArea()
             
-            VStack(spacing: 32) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(accentColor.opacity(0.1))
-                        .frame(width: 100, height: 100)
-                    
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(accentColor)
-                }
-                .padding(.top, 40)
-                
-                VStack(spacing: 12) {
-                    Text("Trial Completed")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(dynamicText)
-                    
-                    Text("You've used Mochi for 3 days.\nUpgrade to keep your data and unlock all features.")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundColor(dynamicText.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-                
-                VStack(spacing: 16) {
-                    Button(action: {
-                        HapticManager.shared.rigidImpact()
-                        SubscriptionManager.shared.showPaywall = true
-                    }) {
-                        HStack {
-                            Text("Upgrade to Mochi +")
-                                .font(.system(size: 17, weight: .bold, design: .monospaced))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .bold))
-                        }
-                        .foregroundColor(isNightTime ? .black : .white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(accentColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .shadow(color: accentColor.opacity(0.3), radius: 10, x: 0, y: 5)
-                    }
-                    
-                    Button(action: {
-                        HapticManager.shared.softSquish()
-                        Task {
-                            await SubscriptionManager.shared.restorePurchases()
-                        }
-                    }) {
-                        Text("Restore Purchases")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(dynamicText.opacity(0.4))
-                    }
-                }
-                .padding(.horizontal, 32)
+            // Subtle accent glow
+            VStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [accentColor.opacity(0.15), accentColor.opacity(0)],
+                            center: .center,
+                            startRadius: 50,
+                            endRadius: 200
+                        )
+                    )
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 60)
+                    .offset(y: -100)
                 
                 Spacer()
-                
-                // Fine print
-                Text("Your history is safe. Unlock it anytime.")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundColor(dynamicText.opacity(0.3))
+            }
+            .ignoresSafeArea()
+            
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 28) {
+                    Spacer().frame(height: 40)
+                    
+                    // Logo
+                    ZStack {
+                        // Soft glow behind logo
+                        Circle()
+                            .fill(accentColor.opacity(0.08))
+                            .frame(width: 140, height: 140)
+                            .blur(radius: 20)
+                        
+                        Image("MochiLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 100, height: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    }
+                    
+                    // Title & Subtitle
+                    VStack(spacing: 8) {
+                        Text("Your Trial Has Ended")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundColor(dynamicText)
+                        
+                        Text("Thanks for trying Mochi! Upgrade to\ncontinue tracking your spending.")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundColor(dynamicText.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(4)
+                    }
+                    .opacity(animateContent ? 1 : 0)
+                    .offset(y: animateContent ? 0 : 20)
+                    
+                    // Feature Highlights
+                    VStack(spacing: 12) {
+                        TrialFeatureRow(
+                            icon: "clock.arrow.circlepath",
+                            title: "Full History Access",
+                            subtitle: "View all your past transactions",
+                            accentColor: accentColor,
+                            textColor: dynamicText
+                        )
+                        
+                        TrialFeatureRow(
+                            icon: "bell.badge",
+                            title: "Smart Reminders",
+                            subtitle: "Daily & weekly spending insights",
+                            accentColor: accentColor,
+                            textColor: dynamicText
+                        )
+                        
+                        TrialFeatureRow(
+                            icon: "paintpalette",
+                            title: "Themes & Customization",
+                            subtitle: "Make Mochi truly yours",
+                            accentColor: accentColor,
+                            textColor: dynamicText
+                        )
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(dynamicText.opacity(0.03))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(dynamicText.opacity(0.05), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 24)
+                    .opacity(animateContent ? 1 : 0)
+                    .offset(y: animateContent ? 0 : 30)
+                    
+                    Spacer().frame(height: 8)
+                    
+                    // CTA Buttons
+                    VStack(spacing: 14) {
+                        Button(action: {
+                            HapticManager.shared.rigidImpact()
+                            SubscriptionManager.shared.showPaywall = true
+                        }) {
+                            HStack(spacing: 10) {
+                                Text("Upgrade to Mochi +")
+                                    .font(.system(size: 17, weight: .bold, design: .monospaced))
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            .foregroundColor(isNightTime ? .black : .white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                LinearGradient(
+                                    colors: [accentColor, accentColor.opacity(0.85)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .shadow(color: accentColor.opacity(0.35), radius: 15, x: 0, y: 8)
+                        }
+                        .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                        
+                        Button(action: {
+                            HapticManager.shared.softSquish()
+                            Task {
+                                await SubscriptionManager.shared.restorePurchases()
+                            }
+                        }) {
+                            Text("Restore Purchases")
+                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                .foregroundColor(dynamicText.opacity(0.4))
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    .opacity(animateContent ? 1 : 0)
+                    
+                    Spacer().frame(height: 20)
+                    
+                    // Fine print
+                    VStack(spacing: 4) {
+                        Text("Your data is safe & waiting for you")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(dynamicText.opacity(0.25))
+                        
+                        Text("·")
+                            .font(.system(size: 10))
+                            .foregroundColor(dynamicText.opacity(0.15))
+                        
+                        Text("Cancel anytime")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundColor(dynamicText.opacity(0.2))
+                    }
                     .padding(.bottom, 40)
+                    .opacity(animateContent ? 1 : 0)
+                }
             }
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
+                animateContent = true
+            }
+        }
+        .contentShape(Rectangle()) // Block all touches from passing through
+        .gesture(DragGesture()) // Consume any drag gestures
+    }
+}
+
+// MARK: - Trial Feature Row
+struct TrialFeatureRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let accentColor: Color
+    let textColor: Color
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(accentColor)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundColor(textColor)
+                
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(textColor.opacity(0.5))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundColor(accentColor.opacity(0.6))
+        }
+        .padding(.vertical, 4)
     }
 }

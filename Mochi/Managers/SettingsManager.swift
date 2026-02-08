@@ -58,6 +58,32 @@ class SettingsManager: ObservableObject {
         return diff
     }
     
+    // MARK: - Speed Dial
+    @AppStorage("speedDialPresetsData") var speedDialPresetsData: Data = Data()
+    
+    struct SpeedDialPreset: Codable, Hashable {
+        let amount: Double
+        let label: String
+        let icon: String // Emoji
+    }
+    
+    var speedDialPresets: [Int: SpeedDialPreset] {
+        get {
+            guard !speedDialPresetsData.isEmpty else { return [:] }
+            do {
+                return try JSONDecoder().decode([Int: SpeedDialPreset].self, from: speedDialPresetsData)
+            } catch {
+                return [:]
+            }
+        }
+        set {
+            if let encoded = try? JSONEncoder().encode(newValue) {
+                speedDialPresetsData = encoded
+                objectWillChange.send()
+            }
+        }
+    }
+    
     // MARK: - Payment Methods
     @AppStorage("paymentMethodsData") private var paymentMethodsData: Data = Data()
     

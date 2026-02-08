@@ -82,6 +82,11 @@ struct SettingsView: View {
                                 MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
                             }
                             
+                            // 2.1 Speed Dial
+                            NavigationLink(destination: SpeedDialSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
+                                MenuRow(icon: "bolt.fill", title: "Speed Dial", value: "", dynamicText: dynamicText)
+                            }
+                            
                             // 2.1 Data & Export
                             if subscription.isPro {
                                 NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
@@ -208,9 +213,15 @@ struct AppearanceSettingsView: View {
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold)) // Standard back arrow size
+                            .font(.system(size: 16, weight: .bold)) // Slightly bolder
                             .foregroundColor(dynamicText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 40, height: 40) // Increased touch target
+                            .background(dynamicText.opacity(0.04)) // Subtle background
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
+                            )
                     }
                     
                     Spacer()
@@ -333,9 +344,15 @@ struct LoggingSettingsView: View {
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold)) // Slightly bolder
                             .foregroundColor(dynamicText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 40, height: 40) // Increased touch target
+                            .background(dynamicText.opacity(0.04)) // Subtle background
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
+                            )
                     }
                     Spacer()
                     Text("Logging")
@@ -453,9 +470,15 @@ struct NotificationSettingsView: View {
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold)) // Slightly bolder
                             .foregroundColor(dynamicText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 40, height: 40) // Increased touch target
+                            .background(dynamicText.opacity(0.04)) // Subtle background
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
+                            )
                     }
                     Spacer()
                     Text("Notifications")
@@ -665,9 +688,15 @@ struct FeedbackSettingsView: View {
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold)) // Slightly bolder
                             .foregroundColor(dynamicText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 40, height: 40) // Increased touch target
+                            .background(dynamicText.opacity(0.04)) // Subtle background
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
+                            )
                     }
                     Spacer()
                     Text("Feedback")
@@ -795,9 +824,15 @@ struct AboutSettingsView: View {
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(dynamicText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                            )
                     }
                     Spacer()
                     Text("About")
@@ -823,23 +858,40 @@ struct AboutSettingsView: View {
                                     HapticManager.shared.softSquish()
                                     subscription.showCustomerCenter = true 
                                 }) {
-                                    HStack(spacing: 8) {
+                                    HStack(spacing: 12) {
                                         Image("MochiLogo")
                                             .resizable()
-                                            .frame(width: 30, height: 30)
-                                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                                        Text("Mochi+ Active")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
+                                            .frame(width: 32, height: 32)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                                            )
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Mochi+ Active")
+                                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                                .foregroundColor(isNightTime ? .white : .primary)
+                                            
+                                            Text("Thank you for your support!")
+                                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                                .foregroundColor(isNightTime ? .white.opacity(0.6) : .secondary)
+                                        }
+                                        
                                         Spacer()
-                                        Image(systemName: "person.circle.fill")
-                                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28).opacity(0.4))
+                                        
+                                        Image(systemName: "person.crop.circle.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(accentColor)
                                     }
-                                    .frame(maxWidth: .infinity)
                                     .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .background(Color(red: 0.98, green: 0.96, blue: 0.93))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .padding(.vertical, 16)
+                                    .background(accentColor.opacity(isNightTime ? 0.15 : 0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                                    )
                                 }
                             }
                         }
@@ -877,22 +929,7 @@ struct AboutSettingsView: View {
                             .background(dynamicText.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        
-                        // Debug Section (Pro Toggle)
-                        #if DEBUG
-                        SettingsSection(icon: "hammer.fill", title: "DEBUG", textColor: dynamicText) {
-                            Toggle(isOn: $subscription.debugForcedPro) {
-                                Text("Force Mochi +")
-                                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                                    .foregroundColor(dynamicText)
-                            }
-                            .tint(accentColor)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(dynamicText.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        #endif
+
                     }
                     .padding(.top, 12)
                 }

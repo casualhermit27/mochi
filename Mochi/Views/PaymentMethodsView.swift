@@ -26,7 +26,7 @@ struct PaymentMethodsView: View {
         if settings.colorTheme != "default" {
             return isNightTime ? currentTheme.backgroundDark : currentTheme.background
         }
-        return Color(UIColor.systemBackground)
+        return isNightTime ? Color.mochiText : Color.mochiBackground
     }
     
     var accentColor: Color {
@@ -43,10 +43,20 @@ struct PaymentMethodsView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                            )
                     }
                     
                     Spacer()
@@ -249,7 +259,7 @@ struct AddEditPaymentMethodView: View {
         if settings.colorTheme != "default" {
             return isNightTime ? currentTheme.backgroundDark : currentTheme.background
         }
-        return Color(UIColor.systemBackground)
+        return isNightTime ? Color.mochiText : Color.mochiBackground
     }
     
     var body: some View {
