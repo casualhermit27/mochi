@@ -1,6 +1,7 @@
 import SwiftUI
 import RevenueCat
 import Combine
+import StoreKit
 
 // MARK: - Subscription Manager (RevenueCat)
 
@@ -107,17 +108,84 @@ class SubscriptionManager: NSObject, ObservableObject {
         }
     }
     
+    @Published var offeringsDebugInfo: String = "Initializing..."
+    @Published var offeringsError: String?
+    
     // MARK: - Fetch Offerings
     
     @MainActor
     func fetchOfferings() async {
+        offeringsError = nil
+        offeringsDebugInfo = "Fetching..."
+        
         do {
             let offerings = try await Purchases.shared.offerings()
             self.currentOffering = offerings.current
+            
+            // Build Debug Info
+            var debug = "Offerings Source: RevenueCat\n"
+            if let current = offerings.current {
+                debug += "Current Offering: \(current.identifier)\n"
+                debug += "Packages: \(current.availablePackages.count)\n"
+                for pkg in current.availablePackages {
+                   debug += "- \(pkg.identifier): \(pkg.storeProduct.productIdentifier) (\(pkg.localizedPriceString))\n"
+                }
+            } else {
+                debug += "Current Offering: None (Check RC Dashboard)\n"
+            }
+            
+            if !offerings.all.isEmpty {
+                 debug += "\nAvailable Offerings:\n"
+                 for (key, off) in offerings.all {
+                     debug += "- \(key): \(off.availablePackages.count) pkgs\n"
+                 }
+            } else {
+                debug += "\nNo Offerings Found.\n"
+            }
+            
+            self.offeringsDebugInfo = debug
+            
+            if self.currentOffering == nil || self.currentOffering?.availablePackages.isEmpty == true {
+                self.offeringsError = "No products found.\n\nCheck Debug Info below."
+            }
         } catch {
+            self.offeringsDebugInfo = "Error: \(error.localizedDescription)"
+            self.offeringsError = error.localizedDescription
+            
+            // Fallback: Check StoreKit directly to diagnose
+            Task {
+                await verifyStoreKitConfiguration()
+            }
+            
             #if DEBUG
             print("❌ Failed to fetch offerings: \(error)")
             #endif
+        }
+    }
+    
+    // MARK: - Diagnostic
+    
+    @MainActor
+    func verifyStoreKitConfiguration() async {
+        // Check if StoreKit can see ANY of our products
+        let commonIds = ["com.mochi.plus.lifetime", "com.mochi.plus.monthly", "com.mochi.plus.annual"]
+        
+        do {
+            let products = try await Product.products(for: commonIds)
+            var debug = "\n[StoreKit Direct Check]\n"
+            if products.isEmpty {
+                debug += "⚠️ StoreKit returned 0 products.\n"
+                debug += "Config file is NOT loaded or IDs don't match.\n"
+            } else {
+                debug += "✅ StoreKit found \(products.count) products:\n"
+                for p in products {
+                    debug += "- \(p.id): \(p.displayPrice)\n"
+                }
+                debug += "-> Issue is likely RevenueCat Mismatch.\n"
+            }
+            self.offeringsDebugInfo += debug
+        } catch {
+            self.offeringsDebugInfo += "\n[StoreKit Check Failed]: \(error)"
         }
     }
     

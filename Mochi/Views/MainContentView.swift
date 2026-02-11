@@ -14,6 +14,7 @@ struct MainContentView: View {
     @ObservedObject var notificationManager = NotificationManager.shared
     
     @State private var showHistory = false
+    @State private var showSettings = false
     @State private var showToast = false
     @State private var toastMessage = "Mochi eaten."
     @State private var showAddedAnimation = false
@@ -194,6 +195,18 @@ struct MainContentView: View {
                     
                     Spacer()
                     
+                    // Settings Button
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundColor(dynamicSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                    }
+                    
                     // History Button (Only clock now, toggle moved to settings)
                     Button(action: {
                         HapticManager.shared.softSquish()
@@ -332,6 +345,11 @@ struct MainContentView: View {
         .sheet(isPresented: $showHistory) {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
+                .presentationCornerRadius(32)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(32)
         }
         .sheet(isPresented: $showPaymentMethods) {

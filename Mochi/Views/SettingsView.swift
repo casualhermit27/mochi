@@ -72,6 +72,17 @@ struct SettingsView: View {
                     
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
+                            // 0. Premium Banner (Visible for Review & Conversion)
+                            if !subscription.isPro {
+                                Button(action: {
+                                    HapticManager.shared.rigidImpact()
+                                    subscription.showPaywall = true
+                                }) {
+                                    UpgradePromoView(subscription: subscription)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             // 1. Appearance
                             NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode.capitalized, dynamicText: dynamicText)

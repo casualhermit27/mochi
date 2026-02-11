@@ -1,0 +1,121 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "8D7513C6",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "39.99",
+      "familyShareable" : false,
+      "internalID" : "6759032401",
+      "localizations" : [
+        {
+          "description" : "Unlock all Mochi+ features forever",
+          "displayName" : "Mochi+ Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.harsha.mochi.lifetime",
+      "referenceName" : "Mochi+ Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6758880826",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "847R6X96S2",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 792491635.21025705,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21923929",
+      "localizations" : [
+
+      ],
+      "name" : "Mochi+",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6759031940",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock all Mochi+ features with a monthly subscription.",
+              "displayName" : "Mochi+ Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.harsha.mochi.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Mochi+ Monthly",
+          "subscriptionGroupID" : "21923929",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6759032215",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock all Mochi+ features with a yearly subscription.",
+              "displayName" : "Mochi+ Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.harsha.mochi.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Mochi+ Yearly",
+          "subscriptionGroupID" : "21923929",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

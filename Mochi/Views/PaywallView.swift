@@ -5,7 +5,6 @@ struct PaywallView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var subscription = SubscriptionManager.shared
     @State private var selectedPackage: Package?
-    @State private var selectedStaticPlan: String? = "yearly" // Default to yearly for screenshots
     @State private var isLoading = false
     
     @ObservedObject var settings = SettingsManager.shared
@@ -131,52 +130,41 @@ struct PaywallView: View {
                     
                     // Pricing Plans
                     VStack(spacing: 12) {
-                        if subscription.currentOffering?.availablePackages.isEmpty ?? true {
-                            // Static Fallback Plans (for screenshots / when RevenueCat isn't loaded)
-                            StaticPlanCard(
-                                name: "Monthly",
-                                price: "$2.99",
-                                subtitle: nil,
-                                isSelected: selectedStaticPlan == "monthly",
-                                textColor: dynamicText,
-                                accentColor: dynamicAccent,
-                                isNightTime: isNightTime
-                            ) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedStaticPlan = "monthly"
+                        if let error = subscription.offeringsError {
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.orange)
+                                Text("Products Failed to Load")
+                                    .font(.headline)
+                                Text(error)
+                                    .font(.caption)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(dynamicText.opacity(0.6))
+                                
+                                // Debug Detail
+                                Text(subscription.offeringsDebugInfo)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(dynamicText.opacity(0.5))
+                                    .padding(8)
+                                    .background(dynamicText.opacity(0.05))
+                                    .cornerRadius(8)
+                                
+                                Button("Retry") {
+                                    Task { await subscription.fetchOfferings() }
                                 }
-                                HapticManager.shared.selection()
+                                .buttonStyle(.bordered)
                             }
-                            
-                            StaticPlanCard(
-                                name: "Yearly",
-                                price: "$19.99",
-                                subtitle: "Best Value · 7-Day Trial",
-                                isSelected: selectedStaticPlan == "yearly",
-                                textColor: dynamicText,
-                                accentColor: dynamicAccent,
-                                isNightTime: isNightTime
-                            ) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedStaticPlan = "yearly"
-                                }
-                                HapticManager.shared.selection()
+                            .padding(.vertical, 20)
+                        } else if subscription.currentOffering?.availablePackages.isEmpty ?? true {
+                            // Loading state while fetching from RevenueCat
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                Text("Loading prices...")
+                                    .font(.caption)
+                                    .foregroundColor(dynamicText.opacity(0.5))
                             }
-                            
-                            StaticPlanCard(
-                                name: "Lifetime",
-                                price: "$39.99",
-                                subtitle: "Pay once, own forever",
-                                isSelected: selectedStaticPlan == "lifetime",
-                                textColor: dynamicText,
-                                accentColor: dynamicAccent,
-                                isNightTime: isNightTime
-                            ) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedStaticPlan = "lifetime"
-                                }
-                                HapticManager.shared.selection()
-                            }
+                            .padding(.vertical, 40)
                         } else {
                             ForEach(subscription.currentOffering?.availablePackages ?? [], id: \.identifier) { package in
                                 PackageCard(
@@ -222,9 +210,9 @@ struct PaywallView: View {
                         HStack(spacing: 12) {
                             Button("Restore") { restoreTapped() }
                             Text("·")
-                            Link("Terms", destination: URL(string: "https://mochi.spent/terms")!)
+                            Link("Terms", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                             Text("·")
-                            Link("Privacy", destination: URL(string: "https://mochi.spent/privacy")!)
+                            Link("Privacy", destination: URL(string: "https://mochi-privacy-policy.vercel.app/")!)
                         }
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(dynamicText.opacity(0.4))
@@ -247,23 +235,12 @@ struct PaywallView: View {
     }
     
     private var buttonLabel: String {
-        // If real packages are loaded
-        if let pkg = selectedPackage {
-            if pkg.packageType == .annual {
-                return "Start 7-Day Free Trial"
-            } else {
-                return "Get Mochi +"
-            }
+        guard let pkg = selectedPackage else { return "Select a Plan" }
+        if pkg.packageType == .annual {
+            return "Start 7-Day Free Trial"
+        } else {
+            return "Get Mochi +"
         }
-        // Static fallback mode
-        if let staticPlan = selectedStaticPlan {
-            if staticPlan == "yearly" {
-                return "Start 7-Day Free Trial"
-            } else {
-                return "Get Mochi +"
-            }
-        }
-        return "Select a Plan"
     }
     
     private func subscribeTapped() {
@@ -361,65 +338,7 @@ struct PackageCard: View {
                 
                 Spacer()
                 
-                // Overriding price display for demo/test consistency as requested
-                let displayPrice: String = {
-                    switch package.packageType {
-                    case .monthly: return "$2.99"
-                    case .annual: return "$19.99"
-                    case .lifetime: return "$39.99"
-                    default: return package.localizedPriceString
-                    }
-                }()
-                
-                Text(displayPrice)
-                    .font(.system(size: 17, weight: .bold, design: .monospaced))
-                    .foregroundColor(isSelected ? (isNightTime ? .black : .white) : textColor)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? accentColor : textColor.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.clear : textColor.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Static Plan Card (Fallback when RevenueCat not loaded)
-
-struct StaticPlanCard: View {
-    let name: String
-    let price: String
-    let subtitle: String?
-    let isSelected: Bool
-    let textColor: Color
-    let accentColor: Color
-    let isNightTime: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                        .foregroundColor(isSelected ? (isNightTime ? .black : .white) : textColor)
-                    
-                    if let subtitle = subtitle {
-                        Text(subtitle)
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundColor(isSelected ? (isNightTime ? .black.opacity(0.6) : .white.opacity(0.7)) : accentColor)
-                    }
-                }
-                
-                Spacer()
-                
-                Text(price)
+                Text(package.localizedPriceString)
                     .font(.system(size: 17, weight: .bold, design: .monospaced))
                     .foregroundColor(isSelected ? (isNightTime ? .black : .white) : textColor)
             }
