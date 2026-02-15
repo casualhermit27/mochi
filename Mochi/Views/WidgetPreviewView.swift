@@ -84,6 +84,5 @@ struct WidgetPreviewView: View {
         }
         .frame(width: size == .small ? 155 : 329, height: 155) // Standard iOS Widget sizes roughly
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
 }

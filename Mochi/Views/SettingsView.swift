@@ -3,6 +3,7 @@ import MessageUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var subscription = SubscriptionManager.shared
     @ObservedObject var notificationManager = NotificationManager.shared
@@ -11,8 +12,11 @@ struct SettingsView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {
@@ -72,37 +76,46 @@ struct SettingsView: View {
                     
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
-                            // 0. Premium Banner (Visible for Review & Conversion)
-                            if !subscription.isPro {
+                            // 0. Membership Status
+                            SettingsSection(icon: "sparkles", title: "MEMBERSHIP", textColor: dynamicText) {
                                 Button(action: {
                                     HapticManager.shared.rigidImpact()
-                                    subscription.showPaywall = true
+                                    if subscription.isPro {
+                                        subscription.showCustomerCenter = true
+                                    } else {
+                                        subscription.showPaywall = true
+                                    }
                                 }) {
-                                    UpgradePromoView(subscription: subscription)
+                                    MembershipCard()
                                 }
                                 .buttonStyle(.plain)
                             }
+                            .padding(.bottom, 8)
 
                             // 1. Appearance
                             NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode.capitalized, dynamicText: dynamicText)
+                                MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode == "amoled" ? "OLED" : settings.themeMode.capitalized, dynamicText: dynamicText)
                             }
+                            .padding(.horizontal, 20)
                             
                             // 2. Logging
                             NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
                             }
+                            .padding(.horizontal, 20)
                             
                             // 2.1 Speed Dial
                             NavigationLink(destination: SpeedDialSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
                                 MenuRow(icon: "bolt.fill", title: "Speed Dial", value: "", dynamicText: dynamicText)
                             }
+                            .padding(.horizontal, 20)
                             
                             // 2.1 Data & Export
-                            if subscription.isPro {
+                            if subscription.isFullAccess {
                                 NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                     MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
                                 }
+                                .padding(.horizontal, 20)
                             } else {
                                 Button(action: {
                                     HapticManager.shared.rigidImpact()
@@ -110,6 +123,7 @@ struct SettingsView: View {
                                 }) {
                                     MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
                                 }
+                                .padding(.horizontal, 20)
                             }
                             
                             
@@ -117,17 +131,20 @@ struct SettingsView: View {
                             NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "bell.fill", title: "Notifications", value: settings.dailyNotificationEnabled ? "On" : "Off", dynamicText: dynamicText)
                             }
+                            .padding(.horizontal, 20)
                             
                             // 4. Feedback
                             NavigationLink(destination: FeedbackSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "waveform", title: "Feedback", value: settings.hapticsEnabled ? "On" : "Off", dynamicText: dynamicText)
                             }
+                            .padding(.horizontal, 20)
                             
                             // 5. About (Separated Rhythm)
                             NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
                                 MenuRow(icon: "info.circle.fill", title: "About", value: "v1.0.0", dynamicText: dynamicText)
                             }
                             .padding(.top, 16) // Extra rhythm separation
+                            .padding(.horizontal, 20)
                             
                             // Footer Anchor
                             VStack(spacing: 4) {
@@ -141,7 +158,6 @@ struct SettingsView: View {
                             .padding(.top, 32)
                             .padding(.bottom, 24)
                         }
-                        .padding(.horizontal, 20)
                     }
                 }
             }
@@ -253,21 +269,25 @@ struct AppearanceSettingsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 32) {
                         SettingsSection(icon: "moon.stars.fill", title: "THEME", textColor: dynamicText) {
-                            HStack(spacing: 0) {
-                                ThemeButton(title: "Auto", mode: "auto", current: settings.themeMode, color: dynamicText, inverseColor: dynamicBackground) {
+                            VStack(spacing: 2) {
+                                ThemeModeRow(icon: "iphone", title: "System", subtitle: "Match iOS appearance", mode: "system", current: settings.themeMode, color: dynamicText) {
+                                    updateTheme("system")
+                                }
+                                ThemeModeRow(icon: "clock.fill", title: "Auto", subtitle: "Dark after 8 pm", mode: "auto", current: settings.themeMode, color: dynamicText) {
                                     updateTheme("auto")
                                 }
-                                ThemeButton(title: "Light", mode: "light", current: settings.themeMode, color: dynamicText, inverseColor: dynamicBackground) {
+                                ThemeModeRow(icon: "sun.max.fill", title: "Light", subtitle: "Always light", mode: "light", current: settings.themeMode, color: dynamicText) {
                                     updateTheme("light")
                                 }
-                                ThemeButton(title: "Dark", mode: "dark", current: settings.themeMode, color: dynamicText, inverseColor: dynamicBackground) {
+                                ThemeModeRow(icon: "moon.fill", title: "Dark", subtitle: "Always dark", mode: "dark", current: settings.themeMode, color: dynamicText) {
                                     updateTheme("dark")
                                 }
-                                ThemeButton(title: "OLED", mode: "amoled", current: settings.themeMode, color: dynamicText, inverseColor: dynamicBackground) {
+                                ThemeModeRow(icon: "circle.fill", title: "OLED", subtitle: "True black", mode: "amoled", current: settings.themeMode, color: dynamicText) {
                                     updateTheme("amoled")
                                 }
                             }
-                            .background(dynamicText.opacity(0.06))
+                            .padding(.vertical, 4)
+                            .background(dynamicText.opacity(0.04))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         
@@ -280,7 +300,7 @@ struct AppearanceSettingsView: View {
                                             isSelected: settings.colorTheme == theme.id,
                                             dynamicText: dynamicText
                                         ) {
-                                            if theme.id == "default" || SubscriptionManager.shared.isPro {
+                                            if theme.id == "default" || SubscriptionManager.shared.isFullAccess {
                                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                                     settings.colorTheme = theme.id
                                                 }
@@ -860,55 +880,35 @@ struct AboutSettingsView: View {
                     VStack(spacing: 32) {
                         // Mochi+ Status
                         SettingsSection(icon: "sparkles", title: "SUBSCRIPTION", textColor: dynamicText) {
-                            if !subscription.isPro {
-                                Button(action: { subscription.showPaywall = true }) {
-                                    UpgradePromoView(subscription: subscription)
+                            Button(action: {
+                                HapticManager.shared.softSquish()
+                                if subscription.isPro {
+                                    subscription.showCustomerCenter = true
+                                } else {
+                                    subscription.showPaywall = true
                                 }
-                            } else {
-                                Button(action: { 
-                                    HapticManager.shared.softSquish()
-                                    subscription.showCustomerCenter = true 
-                                }) {
-                                    HStack(spacing: 12) {
-                                        Image("MochiLogo")
-                                            .resizable()
-                                            .frame(width: 32, height: 32)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1)
-                                            )
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Mochi+ Active")
-                                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                                .foregroundColor(isNightTime ? .white : .primary)
-                                            
-                                            Text("Thank you for your support!")
-                                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                                .foregroundColor(isNightTime ? .white.opacity(0.6) : .secondary)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .font(.system(size: 24))
-                                            .foregroundColor(accentColor)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 16)
-                                    .background(accentColor.opacity(isNightTime ? 0.15 : 0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 18)
-                                            .stroke(accentColor.opacity(0.3), lineWidth: 1)
-                                    )
-                                }
+                            }) {
+                                MembershipCard()
                             }
+                            .buttonStyle(.plain)
                         }
                         
                         SettingsSection(icon: "info.circle.fill", title: "ABOUT", textColor: dynamicText) {
                             VStack(spacing: 0) {
+                                HStack {
+                                    Text("Mochi+")
+                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                    Spacer()
+                                    Text(subscription.statusLabel)
+                                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                        .foregroundColor(subscription.isPro ? accentColor : dynamicText.opacity(0.4))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                
+                                Divider().background(dynamicText.opacity(0.1)).padding(.horizontal, 16)
+                                
                                 HStack {
                                     Text("Restore Purchase")
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -952,8 +952,9 @@ struct AboutSettingsView: View {
     }
 }
 
-struct UpgradePromoView: View {
-    @ObservedObject var subscription: SubscriptionManager
+struct MembershipCard: View {
+    @ObservedObject var subscription = SubscriptionManager.shared
+    
     var body: some View {
         HStack(spacing: 12) {
             Image("MochiLogo")
@@ -962,19 +963,33 @@ struct UpgradePromoView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Upgrade to Mochi+")
+                Text(title)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                Text("Unlock history, themes & widgets")
+                Text(subtitle)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .opacity(0.6)
             }
             Spacer()
-            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).opacity(0.4)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .opacity(0.3)
         }
         .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
         .padding(16)
         .background(Color(red: 0.98, green: 0.96, blue: 0.93))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+    
+    private var title: String {
+        if subscription.isPro { return "Mochi+ Active" }
+        if subscription.isSoftTrial { return "Mochi+ Trial Active" }
+        return "Upgrade to Mochi+"
+    }
+    
+    private var subtitle: String {
+        if subscription.isPro { return "Thank you for your support! ♥️" }
+        if subscription.isFullAccess { return "Mochi is yours to enjoy" }
+        return "Unlock history, themes & widgets"
     }
 }
 
@@ -1004,22 +1019,56 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-struct ThemeButton: View {
+struct ThemeModeRow: View {
+    let icon: String
     let title: String
+    let subtitle: String
     let mode: String
     let current: String
     let color: Color
-    let inverseColor: Color
     let action: () -> Void
+    
     var isSelected: Bool { mode == current }
+    
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundColor(isSelected ? inverseColor : color.opacity(0.6))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(isSelected ? color : Color.clear)
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                action()
+            }
+        }) {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(isSelected ? color : color.opacity(0.35))
+                    .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 14, weight: isSelected ? .semibold : .medium, design: .monospaced))
+                        .foregroundColor(isSelected ? color : color.opacity(0.6))
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundColor(color.opacity(0.35))
+                }
+                
+                Spacer()
+                
+                // Radio indicator
+                ZStack {
+                    Circle()
+                        .stroke(isSelected ? color : color.opacity(0.2), lineWidth: 1.5)
+                        .frame(width: 20, height: 20)
+                    if isSelected {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 12, height: 12)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

@@ -24,6 +24,7 @@ struct ReflectionView: View {
     var onViewHistory: (() -> Void)? = nil
     
     @ObservedObject var settings = SettingsManager.shared
+    @Environment(\.colorScheme) var colorScheme
     @State private var appear = false
     
     // MARK: - Theme Helpers
@@ -31,8 +32,11 @@ struct ReflectionView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {

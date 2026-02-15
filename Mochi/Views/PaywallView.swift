@@ -9,12 +9,22 @@ struct PaywallView: View {
     
     @ObservedObject var settings = SettingsManager.shared
     
+    /// When true, hides close button and shows "Maybe Later" skip
+    var isEmbedded: Bool = false
+    /// Called on successful purchase/restore when embedded
+    var onComplete: (() -> Void)? = nil
+    
+    @Environment(\.colorScheme) var colorScheme
+    
     // Dynamic Theme Logic
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {
@@ -54,20 +64,22 @@ struct PaywallView: View {
                     
                     // Header
                     VStack(spacing: 16) {
-                        // Close Button
-                        HStack {
-                            Spacer()
-                            Button(action: { dismiss() }) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(dynamicText.opacity(0.4))
-                                    .frame(width: 28, height: 28)
-                                    .background(dynamicText.opacity(0.06))
-                                    .clipShape(Circle())
+                        // Close Button (only when presented as sheet)
+                        if !isEmbedded {
+                            HStack {
+                                Spacer()
+                                Button(action: { dismiss() }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(dynamicText.opacity(0.4))
+                                        .frame(width: 28, height: 28)
+                                        .background(dynamicText.opacity(0.06))
+                                        .clipShape(Circle())
+                                }
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.top, 12)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 12)
                         
                         // Logo + (centered)
                         HStack(alignment: .center, spacing: 4) {
@@ -82,11 +94,11 @@ struct PaywallView: View {
                                 .foregroundColor(dynamicAccent)
                         }
                         
-                        Text("Unlock Mochi +")
+                        Text(headerTitle)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(dynamicText)
                         
-                        Text("Everything you need for perfect tracking.")
+                        Text(headerSubtitle)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(dynamicText.opacity(0.5))
                             .multilineTextAlignment(.center)
@@ -110,7 +122,7 @@ struct PaywallView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
-                                ForEach(SettingsManager.PastelTheme.all) { theme in
+                                ForEach(Array(SettingsManager.PastelTheme.all.enumerated()), id: \.element.id) { index, theme in
                                     WidgetPreviewView(
                                         size: .small,
                                         theme: theme,
@@ -128,9 +140,51 @@ struct PaywallView: View {
                         }
                     }
                     
-                    // Pricing Plans
+                    // Pricing Plans or Status Card
                     VStack(spacing: 12) {
-                        if let error = subscription.offeringsError {
+                        if subscription.isFullAccess && !isEmbedded {
+                            // Status Card (Full Access Active)
+                            VStack(spacing: 16) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(dynamicAccent.opacity(0.1))
+                                            .frame(width: 40, height: 40)
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .font(.system(size: 18, weight: .bold))
+                                            .foregroundColor(dynamicAccent)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(subscription.isPro ? "Mochi+ Membership Active" : "Mochi+ Trial Active")
+                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .foregroundColor(dynamicText)
+                                        Text("All premium features are unlocked")
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText.opacity(0.5))
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(dynamicAccent.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(dynamicAccent.opacity(0.1), lineWidth: 1)
+                                )
+                                
+                                if !subscription.isPro {
+                                    Text("Mochi is free during your 3-day trial. We'll remind you before it ends so you can decide if you'd like to continue with Mochi+.")
+                                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                                        .foregroundColor(dynamicText.opacity(0.4))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 20)
+                                        .lineSpacing(4)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        } else if let error = subscription.offeringsError {
                             VStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .font(.largeTitle)
@@ -184,7 +238,7 @@ struct PaywallView: View {
                     }
                     .padding(.horizontal, 24)
                     
-                    // Subscribe Button
+                    // Subscribe Button or Manage Button
                     Button(action: subscribeTapped) {
                         HStack {
                             if isLoading {
@@ -200,28 +254,36 @@ struct PaywallView: View {
                         .frame(height: 56)
                         .background(dynamicAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .shadow(color: dynamicAccent.opacity(0.3), radius: 10, y: 5)
                     }
-                    .disabled(isLoading || selectedPackage == nil)
+                    .disabled(isLoading || (selectedPackage == nil && !subscription.isFullAccess))
                     .padding(.horizontal, 24)
                     
-                    // Fine Print
-                    VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            Button("Restore") { restoreTapped() }
-                            Text("·")
-                            Link("Terms", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-                            Text("·")
-                            Link("Privacy", destination: URL(string: "https://mochi-privacy-policy.vercel.app/")!)
+                    // Fine Print (Only show when not in trial)
+                    if !subscription.isFullAccess {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 12) {
+                                Button("Restore") { restoreTapped() }
+                                Text("·")
+                                Link("Terms", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                                Text("·")
+                                Link("Privacy", destination: URL(string: "https://mochi-privacy-policy.vercel.app/")!)
+                            }
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(dynamicText.opacity(0.4))
+                            
+                            Text("Cancel anytime in the App Store.")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundColor(dynamicText.opacity(0.3))
                         }
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(dynamicText.opacity(0.4))
-                        
-                        Text("Cancel anytime in the App Store.")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(dynamicText.opacity(0.3))
+                        .padding(.bottom, isEmbedded ? 8 : 32)
+                    } else {
+                        Spacer().frame(height: isEmbedded ? 8 : 32)
                     }
-                    .padding(.bottom, 32)
+                    
+                    // Skip button (Not needed in onboarding as we have Start Trial)
+                    if isEmbedded {
+                        Spacer().frame(height: 24)
+                    }
                 }
             }
         }
@@ -234,16 +296,54 @@ struct PaywallView: View {
         }
     }
     
+    // MARK: - Layout Helpers
+    
+    private var headerTitle: String {
+        if subscription.isPro { return "Mochi+ Membership" }
+        if subscription.isFullAccess { return "Mochi+ Trial Active" }
+        return "Unlock Mochi +"
+    }
+    
+    private var headerSubtitle: String {
+        if subscription.isFullAccess { return "Everything is unlocked for you." }
+        return "Everything you need for perfect tracking."
+    }
+    
     private var buttonLabel: String {
+        if subscription.isPro { return "Manage Subscription" }
+        if subscription.isFullAccess && !isEmbedded { return "Got it" }
+        
+        if isEmbedded { return "Start 3-Day Free Trial" }
         guard let pkg = selectedPackage else { return "Select a Plan" }
-        if pkg.packageType == .annual {
-            return "Start 7-Day Free Trial"
+        if let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
+            return "Start \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Free Trial"
         } else {
             return "Get Mochi +"
         }
     }
     
     private func subscribeTapped() {
+        if subscription.isPro {
+            subscription.showCustomerCenter = true
+            return
+        }
+        
+        if subscription.isFullAccess && !isEmbedded {
+            dismiss()
+            return
+        }
+        
+        if isEmbedded {
+            // Direct Start Soft Trial
+            HapticManager.shared.rigidImpact()
+            if let onComplete {
+                onComplete()
+            } else {
+                dismiss()
+            }
+            return
+        }
+        
         guard let package = selectedPackage else { return }
         isLoading = true
         HapticManager.shared.rigidImpact()
@@ -253,7 +353,11 @@ struct PaywallView: View {
             await MainActor.run {
                 isLoading = false
                 if success {
-                    dismiss()
+                    if let onComplete {
+                        onComplete()
+                    } else {
+                        dismiss()
+                    }
                 }
             }
         }
@@ -268,7 +372,11 @@ struct PaywallView: View {
             await MainActor.run {
                 isLoading = false
                 if success && subscription.isPro {
-                    dismiss()
+                    if let onComplete {
+                        onComplete()
+                    } else {
+                        dismiss()
+                    }
                 }
             }
         }
@@ -329,8 +437,12 @@ struct PackageCard: View {
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
                         .foregroundColor(isSelected ? (isNightTime ? .black : .white) : textColor)
                     
-                    if package.packageType == .annual {
-                        Text("Best Value · 7-Day Trial")
+                    if let intro = package.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
+                        Text("Best Value · \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Trial")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(isSelected ? (isNightTime ? .black.opacity(0.6) : .white.opacity(0.7)) : accentColor)
+                    } else if package.packageType == .annual {
+                        Text("Best Value")
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(isSelected ? (isNightTime ? .black.opacity(0.6) : .white.opacity(0.7)) : accentColor)
                     }
@@ -354,5 +466,17 @@ struct PackageCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Helpers
+
+private func introDurationUnit(_ unit: SubscriptionPeriod.Unit) -> String {
+    switch unit {
+    case .day: return "Day"
+    case .week: return "Week"
+    case .month: return "Month"
+    case .year: return "Year"
+    @unknown default: return ""
     }
 }

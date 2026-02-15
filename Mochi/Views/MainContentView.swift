@@ -12,6 +12,8 @@ struct MainContentView: View {
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var notificationManager = NotificationManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
+    @Environment(\.colorScheme) var colorScheme
     
     @State private var showHistory = false
     @State private var showSettings = false
@@ -106,8 +108,11 @@ struct MainContentView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark // "system" or default
     }
     
     var currentTheme: SettingsManager.PastelTheme {
@@ -403,6 +408,7 @@ struct MainContentView: View {
         .onChange(of: settings.colorTheme) { _, _ in updateWidgetData() }
         .onChange(of: settings.themeMode) { _, _ in updateWidgetData() }
         .onChange(of: settings.customCurrencyCode) { _, _ in updateWidgetData() }
+        .onChange(of: subscription.isPro) { _, _ in updateWidgetData() }
         .onShake {
             undoLastAdd()
         }

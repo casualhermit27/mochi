@@ -89,7 +89,7 @@ class WidgetDataManager {
     }
 
     var themeMode: String {
-        sharedDefaults?.string(forKey: themeModeKey) ?? "auto"
+        sharedDefaults?.string(forKey: themeModeKey) ?? "system"
     }
     
     // MARK: - Widget Theme Colors
@@ -114,7 +114,12 @@ class WidgetDataManager {
             case "light":
                 isDark = false
                 isOled = false
-            default: // "auto"
+            case "auto":
+                // Time-based: dark between 8pm–6am
+                let hour = Calendar.current.component(.hour, from: Date())
+                isDark = hour < 6 || hour >= 20
+                isOled = false
+            default: // "system"
                 isDark = systemIsDark
                 isOled = false
             }

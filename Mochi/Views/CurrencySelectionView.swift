@@ -3,6 +3,7 @@ import SwiftUI
 struct CurrencySelectionView: View {
     @ObservedObject var settings = SettingsManager.shared
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @State private var searchText = ""
     
     // Aesthetic Colors (Creamy Palette)
@@ -27,8 +28,11 @@ struct CurrencySelectionView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {

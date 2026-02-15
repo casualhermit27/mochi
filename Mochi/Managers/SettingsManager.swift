@@ -9,9 +9,9 @@ class SettingsManager: ObservableObject {
     // simpler: Let's stick to the current logic but persist it? 
     // The previous implementation used @State private var isDarkModeOverride: Bool? = nil
     // AppStorage doesn't support Optional Bool easily. 
-    // Let's use a String: "auto", "light", "dark".
+    // Let's use a String: "system", "auto", "light", "dark", "amoled".
     
-    @AppStorage("themeMode") var themeMode: String = "auto"
+    @AppStorage("themeMode") var themeMode: String = "system"
     @AppStorage("colorTheme") var colorTheme: String = "default" // default, pink, blue, green, butterscotch, brown
     @AppStorage("customCurrencyCode") var customCurrencyCode: String = "" // Stores ISO code (e.g. "USD", "KRW")
     @AppStorage("widgetMatchTheme") var widgetMatchTheme: Bool = true // Should widget match app theme?

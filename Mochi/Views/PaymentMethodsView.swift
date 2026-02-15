@@ -4,6 +4,7 @@ import SwiftUI
 
 struct PaymentMethodsView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @ObservedObject var settings = SettingsManager.shared
     @State private var showAddSheet = false
     @State private var editingMethod: PaymentMethod? = nil
@@ -13,8 +14,11 @@ struct PaymentMethodsView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {
@@ -232,6 +236,7 @@ struct PaymentMethodCard: View {
 
 struct AddEditPaymentMethodView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @ObservedObject var settings = SettingsManager.shared
     
     let dynamicText: Color
@@ -246,8 +251,11 @@ struct AddEditPaymentMethodView: View {
     var isNightTime: Bool {
         if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
         if settings.themeMode == "light" { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour < 6 || hour >= 20
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
     }
     
     var currentTheme: SettingsManager.PastelTheme {

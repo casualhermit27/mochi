@@ -188,7 +188,7 @@ struct HistoryView: View {
                             if isExpanded {
                                 let isOld = isDateLocked(date)
                                 
-                                if isOld && !SubscriptionManager.shared.isPro {
+                                if isOld && !SubscriptionManager.shared.isFullAccess {
                                     // Locked Entry
                                     VStack(spacing: 12) {
                                         HStack {
