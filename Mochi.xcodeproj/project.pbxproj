@@ -18,6 +18,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		E54BA9182F4366AC00802A05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C316FA7B2F1BEC7400B7E257 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C316FA822F1BEC7400B7E257;
+			remoteInfo = Mochi;
+		};
 		E590D21E2F1BF9A400ACC0CD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C316FA7B2F1BEC7400B7E257 /* Project object */;
@@ -45,6 +52,7 @@
 		C316FA832F1BEC7400B7E257 /* Mochi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mochi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C316FAC52F1BED5E00B7E257 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		C316FAC72F1BED5F00B7E257 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		E54BA9142F4366AC00802A05 /* MochiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MochiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E590D20D2F1BF9A200ACC0CD /* MochiWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MochiWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5B32E022F3752BE00F71F33 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E5B32F7D2F3C623F00F71F33 /* Mochi.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Mochi.storekit; sourceTree = "<group>"; };
@@ -64,6 +72,11 @@
 		C316FA852F1BEC7400B7E257 /* Mochi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Mochi;
+			sourceTree = "<group>";
+		};
+		E54BA9152F4366AC00802A05 /* MochiTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MochiTests;
 			sourceTree = "<group>";
 		};
 		E590D2102F1BF9A200ACC0CD /* MochiWidget */ = {
@@ -87,6 +100,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E54BA9112F4366AC00802A05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E590D20A2F1BF9A200ACC0CD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -105,6 +125,7 @@
 				E5B32F7D2F3C623F00F71F33 /* Mochi.storekit */,
 				C316FA852F1BEC7400B7E257 /* Mochi */,
 				E590D2102F1BF9A200ACC0CD /* MochiWidget */,
+				E54BA9152F4366AC00802A05 /* MochiTests */,
 				C316FAC42F1BED5E00B7E257 /* Frameworks */,
 				C316FA842F1BEC7400B7E257 /* Products */,
 				E5B32E022F3752BE00F71F33 /* PrivacyInfo.xcprivacy */,
@@ -116,6 +137,7 @@
 			children = (
 				C316FA832F1BEC7400B7E257 /* Mochi.app */,
 				E590D20D2F1BF9A200ACC0CD /* MochiWidgetExtension.appex */,
+				E54BA9142F4366AC00802A05 /* MochiTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -159,6 +181,29 @@
 			productReference = C316FA832F1BEC7400B7E257 /* Mochi.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E54BA9132F4366AC00802A05 /* MochiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E54BA91C2F4366AC00802A05 /* Build configuration list for PBXNativeTarget "MochiTests" */;
+			buildPhases = (
+				E54BA9102F4366AC00802A05 /* Sources */,
+				E54BA9112F4366AC00802A05 /* Frameworks */,
+				E54BA9122F4366AC00802A05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E54BA9192F4366AC00802A05 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E54BA9152F4366AC00802A05 /* MochiTests */,
+			);
+			name = MochiTests;
+			packageProductDependencies = (
+			);
+			productName = MochiTests;
+			productReference = E54BA9142F4366AC00802A05 /* MochiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		E590D20C2F1BF9A200ACC0CD /* MochiWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E590D2232F1BF9A400ACC0CD /* Build configuration list for PBXNativeTarget "MochiWidgetExtension" */;
@@ -194,6 +239,10 @@
 					C316FA822F1BEC7400B7E257 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					E54BA9132F4366AC00802A05 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = C316FA822F1BEC7400B7E257;
+					};
 					E590D20C2F1BF9A200ACC0CD = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -218,6 +267,7 @@
 			targets = (
 				C316FA822F1BEC7400B7E257 /* Mochi */,
 				E590D20C2F1BF9A200ACC0CD /* MochiWidgetExtension */,
+				E54BA9132F4366AC00802A05 /* MochiTests */,
 			);
 		};
 /* End PBXProject section */
@@ -229,6 +279,13 @@
 			files = (
 				E5B32F7E2F3C623F00F71F33 /* Mochi.storekit in Resources */,
 				E5B32E202F3752BE00F71F33 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E54BA9122F4366AC00802A05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +306,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E54BA9102F4366AC00802A05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E590D2092F1BF9A200ACC0CD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -259,6 +323,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		E54BA9192F4366AC00802A05 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C316FA822F1BEC7400B7E257 /* Mochi */;
+			targetProxy = E54BA9182F4366AC00802A05 /* PBXContainerItemProxy */;
+		};
 		E590D21F2F1BF9A400ACC0CD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E590D20C2F1BF9A200ACC0CD /* MochiWidgetExtension */;
@@ -394,10 +463,11 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLSchemes =     (\n        mochi\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -433,10 +503,11 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLSchemes =     (\n        mochi\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -461,6 +532,56 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		E54BA91A2F4366AC00802A05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.casualhermit.MochiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mochi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Mochi";
+			};
+			name = Debug;
+		};
+		E54BA91B2F4366AC00802A05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 847R6X96S2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.casualhermit.MochiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mochi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Mochi";
 			};
 			name = Release;
 		};
@@ -551,6 +672,15 @@
 			buildConfigurations = (
 				C316FA912F1BEC7600B7E257 /* Debug */,
 				C316FA922F1BEC7600B7E257 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E54BA91C2F4366AC00802A05 /* Build configuration list for PBXNativeTarget "MochiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E54BA91A2F4366AC00802A05 /* Debug */,
+				E54BA91B2F4366AC00802A05 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

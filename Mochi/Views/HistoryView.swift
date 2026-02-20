@@ -186,9 +186,9 @@ struct HistoryView: View {
                         // Custom Section Header with Disclosure Logic
                          Section {
                             if isExpanded {
-                                let isOld = isDateLocked(date)
+                                let isLocked = isDateLocked(date)
                                 
-                                if isOld && !SubscriptionManager.shared.isFullAccess {
+                                if isLocked {
                                     // Locked Entry
                                     VStack(spacing: 12) {
                                         HStack {
@@ -819,8 +819,15 @@ struct HistoryView: View {
     }
     
     func isDateLocked(_ date: Date) -> Bool {
-        let threeDaysAgo = Calendar.current.date(byAdding: .day, value: -3, to: Date())!
-        return date < Calendar.current.startOfDay(for: threeDaysAgo)
+        // If user is Pro (or on Trial), everything is unlocked.
+        if SubscriptionManager.shared.isPro { return false }
+        
+        // If Free Version (Trial Ended):
+        // Only "Today" is unlocked. Before today is locked.
+        let today = settings.getRitualDay(for: Date())
+        let checkDate = settings.getRitualDay(for: date)
+        
+        return checkDate < today
     }
     
     // MARK: - Quick Filters
@@ -909,7 +916,9 @@ struct HistoryView: View {
                     currencySymbol: settings.currencySymbol,
                     colorTheme: settings.colorTheme,
                     themeMode: settings.themeMode,
-                    isPro: SubscriptionManager.shared.isPro
+                    isPro: SubscriptionManager.shared.isPro,
+                    dayStartHour: settings.dayStartHour,
+                    dayStartMinute: settings.dayStartMinute
                 )
                 // Note: MainView will follow up with correct Totals due to items.count change
                 
@@ -1024,7 +1033,9 @@ struct HistoryView: View {
             currencySymbol: settings.currencySymbol,
             colorTheme: settings.colorTheme,
             themeMode: settings.themeMode,
-            isPro: SubscriptionManager.shared.isPro
+            isPro: SubscriptionManager.shared.isPro,
+            dayStartHour: settings.dayStartHour,
+            dayStartMinute: settings.dayStartMinute
         )
         
         // Reset Selection

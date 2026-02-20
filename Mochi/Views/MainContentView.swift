@@ -14,6 +14,7 @@ struct MainContentView: View {
     @ObservedObject var notificationManager = NotificationManager.shared
     @ObservedObject var subscription = SubscriptionManager.shared
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.scenePhase) var scenePhase
     
     @State private var showHistory = false
     @State private var showSettings = false
@@ -27,6 +28,7 @@ struct MainContentView: View {
     // Input State
     @State private var isInputActive = false
     @State private var currentInput = "0"
+    @State private var currentNote = ""
     
     // Undo State (Add)
     @State private var lastAddedItem: Item?
@@ -72,7 +74,9 @@ struct MainContentView: View {
             currencySymbol: settings.currencySymbol,
             colorTheme: settings.colorTheme,
             themeMode: settings.themeMode,
-            isPro: SubscriptionManager.shared.isPro
+            isPro: SubscriptionManager.shared.isPro,
+            dayStartHour: settings.dayStartHour,
+            dayStartMinute: settings.dayStartMinute
         )
         // Refresh widgets immediately
         WidgetCenter.shared.reloadAllTimelines()
@@ -133,6 +137,9 @@ struct MainContentView: View {
     var dragGesture: some Gesture {
         DragGesture()
             .onEnded { value in
+                // If trial is over (and free), drag is disabled.
+                if isTrialOver { return }
+                
                 if value.translation.height < -50 {
                     HapticManager.shared.softSquish()
                     showHistory = true
@@ -173,13 +180,16 @@ struct MainContentView: View {
     }
 
     private var isTrialOver: Bool {
-        return settings.daysSinceFirstUse >= 3 && !SubscriptionManager.shared.isPro
+        return !SubscriptionManager.shared.isPro
     }
+    
+    @AppStorage("hasDismissedTrialOverlay") private var hasDismissedTrialOverlay = false
 
     var body: some View {
-        ZStack {
-            // Background with smooth theme transition
-            dynamicBackground.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                // Background with smooth theme transition
+                dynamicBackground.ignoresSafeArea()
                 .animation(.easeInOut(duration: 0.6), value: isNightTime)
                 .animation(.easeInOut(duration: 0.6), value: settings.themeMode)
             
@@ -211,8 +221,9 @@ struct MainContentView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 8)
                     }
+                    .accessibilityIdentifier("settings_button")
                     
-                    // History Button (Only clock now, toggle moved to settings)
+                    // History Button
                     Button(action: {
                         HapticManager.shared.softSquish()
                         showHistory = true
@@ -220,10 +231,12 @@ struct MainContentView: View {
                         Image(systemName: "clock")
                             .font(.system(size: 24, weight: .light))
                             .foregroundColor(dynamicSecondary)
+                            .padding(.leading, 8)
                             .padding(.trailing, 24)
                             .padding(.vertical, 8)
                     }
-                    .disabled(isTrialOver)
+                    .accessibilityIdentifier("history_button")
+                    
                 }
                 .padding(.top, 10)
                 
@@ -241,6 +254,7 @@ struct MainContentView: View {
                         Text(displayValue)
                             .font(.system(size: 108, weight: .medium, design: .monospaced))
                             .foregroundColor(isEffectivelyInputting ? dynamicText : accentColor.opacity(0.55))
+                            .accessibilityIdentifier("display_value")
                     }
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
@@ -269,6 +283,7 @@ struct MainContentView: View {
                     }
                 }
                 .frame(maxHeight: 200)
+                .offset(y: -20) // Nudge up slightly
                 
                 // Label indicating state
                 if !isEffectivelyInputting && dailyTotal > 0 {
@@ -285,11 +300,19 @@ struct MainContentView: View {
                 if isEffectivelyInputting || showPaymentSelector {
                     PaymentMethodSelector(
                         isVisible: $showPaymentSelector,
+                        note: $currentNote,
                         dynamicText: dynamicText,
                         dynamicBackground: dynamicBackground,
                         accentColor: accentColor,
                         onAddRequest: {
-                            showPaymentMethods = true
+                            if isTrialOver {
+                                subscription.showPaywall = true
+                            } else {
+                                showPaymentMethods = true
+                            }
+                        },
+                        onSave: {
+                            saveEntry()
                         }
                     )
                     .transition(.asymmetric(
@@ -312,17 +335,23 @@ struct MainContentView: View {
                         .background(doneButtonColor)
                         .clipShape(Capsule())
                 }
+                .accessibilityIdentifier("spent_button")
                 .disabled(!isInputActive)
                 .padding(.bottom, 40)
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             
             // Trial Completed Block
-            if isTrialOver {
+            // Shows once when trial expires. User can dismiss to enter "Free Mode"
+            if isTrialOver && !hasDismissedTrialOverlay {
                 TrialCompletedOverlay(
                     dynamicText: dynamicText, 
                     dynamicBackground: dynamicBackground, 
                     accentColor: accentColor, 
-                    isNightTime: isNightTime
+                    isNightTime: isNightTime,
+                    onContinueFree: {
+                         withAnimation { hasDismissedTrialOverlay = true }
+                    }
                 )
                 .transition(.opacity.combined(with: .scale(scale: 1.1)))
                 .zIndex(999) // Ensure it's on top of everything
@@ -345,8 +374,15 @@ struct MainContentView: View {
                 }
                 .zIndex(100)
             }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .ignoresSafeArea(.keyboard)
+            .onTapGesture {
+                // Dismiss keyboard on background tap
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
         }
-        .simultaneousGesture(isTrialOver ? nil : dragGesture)
+        .simultaneousGesture(dragGesture)
         .sheet(isPresented: $showHistory) {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
@@ -368,8 +404,12 @@ struct MainContentView: View {
         }
         .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
             if shouldDismiss {
+                showSettings = false
                 showHistory = false
                 showPaymentMethods = false
+                subscription.showPaywall = false
+                isInputActive = false
+                currentInput = "0"
             }
         }
         .onChange(of: showHistory) { _, isPresented in
@@ -394,6 +434,8 @@ struct MainContentView: View {
             }
             // Update widget data
             updateWidgetData()
+            // Ensure notifications are up to date
+            notificationManager.scheduleNotifications()
         }
         .onChange(of: items.count) { oldValue, newValue in
             // Update widget when items change
@@ -404,18 +446,45 @@ struct MainContentView: View {
             } else {
                 updateWidgetData(includeLastTransaction: true)
             }
+            
+            // Update daily notification with new spend
+            notificationManager.scheduleNotifications()
         }
         .onChange(of: settings.colorTheme) { _, _ in updateWidgetData() }
         .onChange(of: settings.themeMode) { _, _ in updateWidgetData() }
         .onChange(of: settings.customCurrencyCode) { _, _ in updateWidgetData() }
         .onChange(of: subscription.isPro) { _, _ in updateWidgetData() }
+        .onChange(of: notificationManager.shouldOpenHistory) { _, shouldOpen in
+            if shouldOpen {
+                // Dimiss any other sheets to ensure History can open
+                showSettings = false
+                showPaymentMethods = false
+                subscription.showPaywall = false
+                
+                // Slight delay to allow dismissal loop to process? 
+                // Usually state updates overlapping might be tricky.
+                // Let's rely on SwiftUI's diffing, but if it fails, a 0.1s delay helps.
+                // For now, direct set.
+                notificationManager.shouldOpenHistory = false
+                showHistory = true
+            }
+        }
         .onShake {
             undoLastAdd()
         }
-        .onChange(of: notificationManager.shouldOpenHistory) { _, shouldOpen in
-            if shouldOpen {
-                notificationManager.shouldOpenHistory = false
-                showHistory = true
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // Update Widget
+                updateWidgetData()
+                
+                // Refresh Notifications (badges, etc)
+                notificationManager.scheduleNotifications()
+                
+                // CRITICAL: Re-check subscription status on foreground
+                // This handles cases where purchase completed outside app or status changed
+                Task {
+                    await subscription.checkSubscriptionStatus()
+                }
             }
         }
     }
@@ -541,7 +610,7 @@ struct MainContentView: View {
         HapticManager.shared.rigidImpact()
         
         let methodId = settings.selectedPaymentMethod.id.uuidString
-        let newItem = Item(timestamp: Date(), amount: amount, paymentMethodId: methodId)
+        let newItem = Item(timestamp: Date(), amount: amount, note: currentNote.isEmpty ? nil : currentNote, paymentMethodId: methodId)
         modelContext.insert(newItem)
         
         // Update Undo State
@@ -562,6 +631,7 @@ struct MainContentView: View {
         withAnimation {
             isInputActive = false // Go back to Total view
             currentInput = "0"
+            currentNote = ""
         }
         
         // Hide Animation after delay
@@ -608,6 +678,7 @@ struct MainContentView: View {
             withAnimation {
                 showToast = true
                 currentInput = String(format: "%.0f", item.amount) // Optional: Restore Input
+                currentNote = item.note ?? ""
                 lastAddedItem = nil // Prevent double undo
                 lastAddedTime = nil
             }
@@ -625,51 +696,25 @@ struct TrialCompletedOverlay: View {
     let dynamicBackground: Color
     let accentColor: Color
     let isNightTime: Bool
+    var onContinueFree: () -> Void
     
     @State private var animateContent = false
     
     var body: some View {
         ZStack {
-            // Background with subtle gradient
+            // Background
             dynamicBackground.ignoresSafeArea()
-            
-            // Subtle accent glow
-            VStack {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [accentColor.opacity(0.15), accentColor.opacity(0)],
-                            center: .center,
-                            startRadius: 50,
-                            endRadius: 200
-                        )
-                    )
-                    .frame(width: 400, height: 400)
-                    .blur(radius: 60)
-                    .offset(y: -100)
-                
-                Spacer()
-            }
-            .ignoresSafeArea()
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 28) {
                     Spacer().frame(height: 40)
                     
                     // Logo
-                    ZStack {
-                        // Soft glow behind logo
-                        Circle()
-                            .fill(accentColor.opacity(0.08))
-                            .frame(width: 140, height: 140)
-                            .blur(radius: 20)
-                        
-                        Image("MochiLogo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    }
+                    Image("MochiLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 100, height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     
                     // Title & Subtitle
                     VStack(spacing: 8) {
@@ -677,7 +722,7 @@ struct TrialCompletedOverlay: View {
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(dynamicText)
                         
-                        Text("Thanks for trying Mochi! Upgrade to\ncontinue tracking your spending.")
+                        Text("Thanks for trying Mochi! Upgrade to\nMochi + to continue tracking.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(dynamicText.opacity(0.5))
                             .multilineTextAlignment(.center)
@@ -734,24 +779,15 @@ struct TrialCompletedOverlay: View {
                             HapticManager.shared.rigidImpact()
                             SubscriptionManager.shared.showPaywall = true
                         }) {
-                            HStack(spacing: 10) {
+                            HStack(spacing: 12) {
                                 Text("Upgrade to Mochi +")
                                     .font(.system(size: 17, weight: .bold, design: .monospaced))
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 14, weight: .bold))
                             }
                             .foregroundColor(isNightTime ? .black : .white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [accentColor, accentColor.opacity(0.85)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .background(accentColor)
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .shadow(color: accentColor.opacity(0.35), radius: 15, x: 0, y: 8)
                         }
                         .buttonStyle(SquishyButtonStyle(isDoneButton: true))
                         
@@ -771,19 +807,17 @@ struct TrialCompletedOverlay: View {
                     
                     Spacer().frame(height: 20)
                     
-                    // Fine print
-                    VStack(spacing: 4) {
-                        Text("Your data is safe & waiting for you")
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .foregroundColor(dynamicText.opacity(0.25))
-                        
-                        Text("·")
-                            .font(.system(size: 10))
-                            .foregroundColor(dynamicText.opacity(0.15))
-                        
-                        Text("Cancel anytime")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundColor(dynamicText.opacity(0.2))
+                    .padding(.bottom, 20)
+                    
+                    // Continue Free Button
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        onContinueFree()
+                    }) {
+                        Text("Continue with Free Version")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(dynamicText.opacity(0.5))
+                            .underline()
                     }
                     .padding(.bottom, 40)
                     .opacity(animateContent ? 1 : 0)

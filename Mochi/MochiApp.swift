@@ -3,6 +3,7 @@ import SwiftData
 
 @main
 struct MochiApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @ObservedObject private var settings = SettingsManager.shared
     @ObservedObject private var notificationManager = NotificationManager.shared
     
@@ -10,7 +11,28 @@ struct MochiApp: App {
         let schema = Schema([
             Item.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        
+        let appGroupID = "group.com.mochi.spent"
+        let storeURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)!
+            .appendingPathComponent("Mochi.sqlite")
+        
+        // Migration logic: If data exists in the old default location, move it.
+        let defaultURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("default.sqlite")
+        
+        if FileManager.default.fileExists(atPath: defaultURL.path) && !FileManager.default.fileExists(atPath: storeURL.path) {
+            try? FileManager.default.moveItem(at: defaultURL, to: storeURL)
+            // Also attempt to move the shm and wal files if they exist for a cleaner migration
+            let shmOld = defaultURL.deletingPathExtension().appendingPathExtension("sqlite-shm")
+            let shmNew = storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm")
+            try? FileManager.default.moveItem(at: shmOld, to: shmNew)
+            
+            let walOld = defaultURL.deletingPathExtension().appendingPathExtension("sqlite-wal")
+            let walNew = storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal")
+            try? FileManager.default.moveItem(at: walOld, to: walNew)
+        }
+
+        let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -32,6 +54,7 @@ struct MochiApp: App {
                 }
                 .sheet(isPresented: $subscriptionManager.showPaywall) {
                     PaywallView()
+                        .presentationCornerRadius(32)
                 }
                 .sheet(isPresented: .init(
                     get: { !settings.hasCompletedOnboarding },
@@ -58,6 +81,15 @@ struct MochiApp: App {
                         }
                     )
                 }
+                .onOpenURL { url in
+                    print("Mochi opened with URL: \(url)")
+                }
+                .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
+                    if shouldDismiss {
+                        subscriptionManager.showCustomerCenter = false
+                        subscriptionManager.showPaywall = false
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
     }
@@ -71,5 +103,11 @@ struct SubscriptionCustomerCenterView: View {
     
     var body: some View {
         CustomerCenterView()
+    }
+}
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        return .portrait
     }
 }

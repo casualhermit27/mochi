@@ -74,6 +74,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     
     // MARK: - Scheduling
     
+    @MainActor
     func scheduleNotifications() {
         let settings = SettingsManager.shared
         let center = UNUserNotificationCenter.current()
@@ -87,9 +88,18 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
         
         // --- Daily Notification ---
         if settings.dailyNotificationEnabled {
+            let symbol = settings.currencySymbol
+            let dailyTotal = getDailyTotal()
+            
             let content = UNMutableNotificationContent()
             content.title = "Mochi"
-            content.body = "Here’s a calm look at today’s spending."
+            
+            if dailyTotal > 0 {
+                content.body = "You spent \(symbol)\(formatAmount(dailyTotal)) today. Tap to view."
+            } else {
+                content.body = "You haven't tracked any spending today. Tap to view."
+            }
+            
             content.sound = .default
             content.userInfo = ["type": "daily_summary"]
             
@@ -170,15 +180,21 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                 let today = Date()
                 
                 // Daily
-                let todayItems = items.filter { calendar.isDateInToday($0.timestamp) }
+                let settings = SettingsManager.shared
+                let currentRitual = settings.getRitualDay(for: today)
+                let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitual }
                 dailyTotal = todayItems.reduce(0) { $0 + $1.amount }
                 
-                // Weekly
-                if let weekInterval = calendar.dateInterval(of: .weekOfYear, for: today) {
-                     let weekItems = items.filter { weekInterval.contains($0.timestamp) }
-                     let weekTotal = weekItems.reduce(0) { $0 + $1.amount }
-                     weeklyAvg = weekTotal / 7.0
+                // Weekly: Ritual-aware sliding 7-day window
+                let currentRitualDay = currentRitual // Reuse daily ritual day calculation
+                let startOfWindow = calendar.date(byAdding: .day, value: -6, to: currentRitualDay)!
+                
+                let weekItems = items.filter { item in
+                    let ritual = settings.getRitualDay(for: item.timestamp)
+                    return ritual >= startOfWindow && ritual <= currentRitualDay
                 }
+                let weekTotal = weekItems.reduce(0) { $0 + $1.amount }
+                weeklyAvg = weekTotal
             }
         }
         
@@ -193,7 +209,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
             
         case .weekly:
             content.title = "This Week"
-            content.body = "Your average daily spend was \(symbol)\(formatAmount(weeklyAvg))."
+            content.body = "You spent \(symbol)\(formatAmount(weeklyAvg)) this week." // Using Total
             content.userInfo = ["type": "weekly_summary"]
         }
         
@@ -227,8 +243,6 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
         self.modelContainer = container
     }
     
-    // MARK: - Reflection Trigger (UI)
-    
     @MainActor
     func triggerReflection(type: ReflectionData.ReflectionType) {
         let symbol = SettingsManager.shared.currencySymbol
@@ -253,13 +267,20 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                 
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
                     
+                    let startFormatter = DateFormatter()
+                    startFormatter.dateFormat = "MMM d"
+                    
+                    let endFormatter = DateFormatter()
+                    endFormatter.dateFormat = "MMM d"
+                    
                     switch type {
                     case .daily:
-                        // Real Daily Data
-                        let todayItems = items.filter { calendar.isDateInToday($0.timestamp) }
+                        // Real Daily Data (Ritual Aware)
+                        let settings = SettingsManager.shared
+                        let currentRitual = settings.getRitualDay(for: today)
+                        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitual }
                         let todayTotal = todayItems.reduce(0) { $0 + $1.amount }
                         
-                        // Calculate Average (Last 30 active days)
                         let grouped = Dictionary(grouping: items) { calendar.startOfDay(for: $0.timestamp) }
                         let recentDays = grouped.keys.sorted(by: >).prefix(30)
                         let totalSpend = recentDays.reduce(0) { sum, date in sum + (grouped[date]?.reduce(0) { $0 + $1.amount } ?? 0) }
@@ -286,45 +307,29 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                         )
                         
                     case .weekly:
-                        // Real Weekly Data
-                        // This week (Sunday/Monday to now)
-                        let weekInterval = calendar.dateInterval(of: .weekOfYear, for: today)!
-                        let weekItems = items.filter { weekInterval.contains($0.timestamp) }
+                        // Ritual-Aware Weekly Data: Last 7 days including today
+                        let settings = SettingsManager.shared
+                        let currentRitualDay = settings.getRitualDay(for: today)
+                        let startOfWindow = calendar.date(byAdding: .day, value: -6, to: currentRitualDay)!
+                        
+                        let weekItems = items.filter { item in
+                            let ritual = settings.getRitualDay(for: item.timestamp)
+                            return ritual >= startOfWindow && ritual <= currentRitualDay
+                        }
+                        
                         let weekTotal = weekItems.reduce(0) { $0 + $1.amount }
-                        let dailyAvg = weekTotal / 7.0 // Simple average over 7 days
+                        let dailyAvg = weekTotal / 7.0
                         
-                        // Highest Day
-                        let weekGrouped = Dictionary(grouping: weekItems) { calendar.component(.weekday, from: $0.timestamp) }
-                        let maxDay = weekGrouped.max { a, b in
-                            let sumA = a.value.reduce(0) { $0 + $1.amount }
-                            let sumB = b.value.reduce(0) { $0 + $1.amount }
-                            return sumA < sumB
-                        }
-                        
-                        let weekdaySymbols = calendar.weekdaySymbols
-                        let maxDayName = maxDay != nil ? weekdaySymbols[maxDay!.key - 1] : "None"
-                        
-                        let startFormatter = DateFormatter()
-                        startFormatter.dateFormat = "MMM d"
-                        let startStr = startFormatter.string(from: weekInterval.start)
-                        
-                        let endFormatter = DateFormatter()
-                        let endDate = weekInterval.end.addingTimeInterval(-1)
-                        // Smart formatting: if same month, show only day
-                        if calendar.isDate(weekInterval.start, equalTo: endDate, toGranularity: .month) {
-                            endFormatter.dateFormat = "d"
-                        } else {
-                            endFormatter.dateFormat = "MMM d"
-                        }
-                        let endStr = endFormatter.string(from: endDate)
+                        let startStr = startFormatter.string(from: startOfWindow)
+                        let endStr = endFormatter.string(from: today)
                         
                         self.activeReflection = ReflectionData(
                             type: .weekly,
-                            timeLabel: "This Week • \(startStr) – \(endStr)",
+                            timeLabel: "Last 7 Days • \(startStr) – \(endStr)",
                             currencySymbol: symbol,
-                            amount: self.formatAmount(dailyAvg), // "Daily Average" asked in mock
-                            primaryText: "Daily Average",
-                            secondaryText: "Highest spend: \(maxDayName)."
+                            amount: self.formatAmount(weekTotal),
+                            primaryText: "You spent",
+                            secondaryText: "Daily Average: \(symbol)\(self.formatAmount(dailyAvg))"
                         )
                     }
                 }
@@ -333,7 +338,24 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     private func formatAmount(_ amount: Double) -> String {
-        // "rounded to nearest number"
-        return String(format: "%.0f", amount)
+        if amount.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f", amount)
+        } else {
+            return String(format: "%.2f", amount)
+        }
+    }
+    
+    @MainActor
+    private func getDailyTotal() -> Double {
+        guard let container = modelContainer else { return 0 }
+        let context = container.mainContext
+        let descriptor = FetchDescriptor<Item>()
+        
+        let items = (try? context.fetch(descriptor)) ?? []
+        let settings = SettingsManager.shared
+        let currentRitualDay = settings.getRitualDay(for: Date())
+        
+        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
+        return todayItems.reduce(0) { $0 + $1.amount }
     }
 }

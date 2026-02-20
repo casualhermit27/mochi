@@ -19,58 +19,58 @@ struct SpeedDialSettingsView: View {
         ZStack {
             dynamicBackground.ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 24) {
-                    
-                    // Custom Header
-                    HStack {
-                        Button(action: {
-                            HapticManager.shared.softSquish()
-                            dismiss()
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(dynamicText)
-                                .frame(width: 40, height: 40)
-                                .background(dynamicText.opacity(0.04))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(dynamicText.opacity(0.1), lineWidth: 1)
-                                )
-                        }
-                        
-                        Spacer()
-                        
-                        // Icon or Title
-                        HStack(spacing: 8) {
-                            Image(systemName: "bolt.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(SettingsManager.shared.currentPastelTheme.accent)
-                            Text("Speed Dial")
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundColor(dynamicText)
-                        }
-                        
-                        Spacer()
-                        
-                        // Balance
-                        Color.clear.frame(width: 32, height: 32)
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                            )
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
                     
-                    VStack(spacing: 8) {
-                        Text("Long press any number on the keypad to\ninstantly add a preset transaction.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundColor(dynamicText.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(4)
+                    Spacer()
+                    
+                    // Icon or Title
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(SettingsManager.shared.currentPastelTheme.accent)
+                        Text("Speed Dial")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundColor(dynamicText)
                     }
-                    .padding(.top, 12)
+                    
+                    Spacer()
+                    
+                    // Balance
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+                
+                Spacer()
+                
+                // Content Group
+                VStack(spacing: 32) {
+                    Text("Long press any number on the keypad to\ninstantly add a preset transaction.")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundColor(dynamicText.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
                     
                     // Keypad Grid Preview
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 20) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 24) {
                         ForEach(1...9, id: \.self) { num in
                             Button {
                                 editingKey = num
@@ -94,8 +94,10 @@ struct SpeedDialSettingsView: View {
                         }
                     }
                     .padding(.horizontal, 40)
-                    .padding(.vertical, 20)
                 }
+                
+                Spacer()
+                Spacer() // Weighted push to keep it slightly above true center for optical balance
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -193,7 +195,7 @@ struct SpeedDialKeyView: View {
             ZStack {
                 Circle()
                     .fill(preset != nil ? accentColor.opacity(0.15) : dynamicText.opacity(0.05))
-                    .frame(width: 80, height: 80)
+                    .frame(width: 96, height: 96) // Increased from 80
                 
                 if let preset = preset {
                     VStack(spacing: 2) {
@@ -203,7 +205,7 @@ struct SpeedDialKeyView: View {
                     }
                 } else {
                     Text("\(number)")
-                        .font(.system(size: 32, weight: .medium, design: .monospaced))
+                        .font(.system(size: 38, weight: .medium, design: .monospaced)) // Increased from 32
                         .foregroundColor(dynamicText.opacity(0.3))
                 }
             }
@@ -212,7 +214,7 @@ struct SpeedDialKeyView: View {
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundColor(dynamicText.opacity(preset != nil ? 0.8 : 0.3))
                 .lineLimit(1)
-                .frame(width: 80)
+                .frame(width: 96)
         }
     }
 }

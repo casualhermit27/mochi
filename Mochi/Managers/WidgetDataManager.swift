@@ -7,7 +7,7 @@ import SwiftUI
 class WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    // App Group identifier - Update this with your actual App Group ID
+    // App Group identifier
     private let appGroupID = "group.com.mochi.spent"
     
     private var sharedDefaults: UserDefaults? {
@@ -23,6 +23,9 @@ class WidgetDataManager {
     private let currencySymbolKey = "widget_currency_symbol"
     private let colorThemeKey = "widget_color_theme"
     private let themeModeKey = "widget_theme_mode"
+    private let isProKey = "widget_is_pro"
+    private let dayStartHourKey = "widget_day_start_hour"
+    private let dayStartMinuteKey = "widget_day_start_minute"
     
     // MARK: - Save Data (Called from main app)
     
@@ -34,7 +37,9 @@ class WidgetDataManager {
         currencySymbol: String,
         colorTheme: String,
         themeMode: String,
-        isPro: Bool
+        isPro: Bool,
+        dayStartHour: Int,
+        dayStartMinute: Int
     ) {
         sharedDefaults?.set(todayTotal, forKey: todayTotalKey)
         sharedDefaults?.set(yesterdayTotal, forKey: yesterdayTotalKey)
@@ -51,29 +56,31 @@ class WidgetDataManager {
         sharedDefaults?.set(currencySymbol, forKey: currencySymbolKey)
         sharedDefaults?.set(colorTheme, forKey: colorThemeKey)
         sharedDefaults?.set(themeMode, forKey: themeModeKey)
-        sharedDefaults?.set(isPro, forKey: "widget_is_pro")
+        sharedDefaults?.set(isPro, forKey: isProKey)
+        sharedDefaults?.set(dayStartHour, forKey: dayStartHourKey)
+        sharedDefaults?.set(dayStartMinute, forKey: dayStartMinuteKey)
     }
     
     // MARK: - Read Data (Called from widget)
     
-    var isPro: Bool {
-        sharedDefaults?.bool(forKey: "widget_is_pro") ?? false
-    }
-
     var todayTotal: Double {
-        sharedDefaults?.double(forKey: todayTotalKey) ?? 0
+        checkAndResetStaleData()
+        return sharedDefaults?.double(forKey: todayTotalKey) ?? 0
     }
     
     var yesterdayTotal: Double {
-        sharedDefaults?.double(forKey: yesterdayTotalKey) ?? 0
+        checkAndResetStaleData()
+        return sharedDefaults?.double(forKey: yesterdayTotalKey) ?? 0
     }
     
     var lastTransaction: Double {
-        sharedDefaults?.double(forKey: lastTransactionKey) ?? 0
+        checkAndResetStaleData()
+        return sharedDefaults?.double(forKey: lastTransactionKey) ?? 0
     }
     
     var lastTransactionNote: String {
-        sharedDefaults?.string(forKey: lastTransactionNoteKey) ?? ""
+        checkAndResetStaleData()
+        return sharedDefaults?.string(forKey: lastTransactionNoteKey) ?? ""
     }
     
     var lastUpdate: Date? {
@@ -89,7 +96,64 @@ class WidgetDataManager {
     }
 
     var themeMode: String {
-        sharedDefaults?.string(forKey: themeModeKey) ?? "system"
+        sharedDefaults?.string(forKey: themeModeKey) ?? "auto"
+    }
+    
+    var isPro: Bool {
+        sharedDefaults?.bool(forKey: isProKey) ?? false
+    }
+    
+    // MARK: - Stale Data Logic
+    
+    private func checkAndResetStaleData() {
+        guard let lastUpdate = lastUpdate else { return }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        let startHour = sharedDefaults?.integer(forKey: dayStartHourKey) ?? 0
+        let startMinute = sharedDefaults?.integer(forKey: dayStartMinuteKey) ?? 0
+        
+        func getRitualDay(for date: Date) -> Date {
+            let hour = calendar.component(.hour, from: date)
+            let minute = calendar.component(.minute, from: date)
+            let timeInMinutes = hour * 60 + minute
+            let thresholdInMinutes = startHour * 60 + startMinute
+            
+            if timeInMinutes < thresholdInMinutes {
+                return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -1, to: date)!)
+            } else {
+                return calendar.startOfDay(for: date)
+            }
+        }
+        
+        let lastRitualDay = getRitualDay(for: lastUpdate)
+        let currentRitualDay = getRitualDay(for: now)
+        
+        if currentRitualDay > lastRitualDay {
+            // It's a new day!
+            let yesterdayTotalVal = sharedDefaults?.double(forKey: todayTotalKey) ?? 0
+            
+            // If it's EXACTLY the next day, Today becomes Yesterday.
+            // If more than 1 day has passed, Yesterday also becomes 0.
+            let daysDiff = calendar.dateComponents([.day], from: lastRitualDay, to: currentRitualDay).day ?? 0
+            
+            if daysDiff == 1 {
+                sharedDefaults?.set(yesterdayTotalVal, forKey: yesterdayTotalKey)
+            } else {
+                sharedDefaults?.set(0.0, forKey: yesterdayTotalKey)
+            }
+            
+            // Today is definitely 0 now
+            sharedDefaults?.set(0.0, forKey: todayTotalKey)
+            
+            // Clear last transaction as it's from a previous day
+            sharedDefaults?.set(0.0, forKey: lastTransactionKey)
+            sharedDefaults?.set("", forKey: lastTransactionNoteKey)
+            
+            // Mark the "reset" as a new update so we don't keep resetting
+            sharedDefaults?.set(now, forKey: lastUpdateKey)
+        }
     }
     
     // MARK: - Widget Theme Colors
@@ -100,7 +164,6 @@ class WidgetDataManager {
         let accent: Color
         
         static func forTheme(_ themeId: String, themeMode: String, systemIsDark: Bool) -> WidgetTheme {
-            // Determine effective dark mode
             let isDark: Bool
             let isOled: Bool
             
@@ -114,17 +177,11 @@ class WidgetDataManager {
             case "light":
                 isDark = false
                 isOled = false
-            case "auto":
-                // Time-based: dark between 8pm–6am
-                let hour = Calendar.current.component(.hour, from: Date())
-                isDark = hour < 6 || hour >= 20
-                isOled = false
-            default: // "system"
+            default: // "auto"
                 isDark = systemIsDark
                 isOled = false
             }
             
-            // Helper to get OLED background if needed
             let darkBg = isOled ? Color.black : nil
             
             switch themeId {
@@ -159,7 +216,6 @@ class WidgetDataManager {
                     accent: Color(red: 0.60, green: 0.45, blue: 0.35)
                 )
             default:
-                // Default theme
                 return WidgetTheme(
                     background: isDark ? (darkBg ?? Color(red: 0.11, green: 0.11, blue: 0.12)) : Color(red: 0.98, green: 0.97, blue: 0.95),
                     text: isDark ? Color.white : Color(red: 0.2, green: 0.2, blue: 0.2),
@@ -170,7 +226,6 @@ class WidgetDataManager {
     }
     
     func getWidgetTheme(isDark: Bool) -> WidgetTheme {
-        // Check if user has enabled theme matching for widget
         let matchTheme = sharedDefaults?.bool(forKey: "widget_match_theme") ?? true
         
         // Gate: If not pro, always use default
@@ -179,7 +234,6 @@ class WidgetDataManager {
         }
         
         if !matchTheme {
-            // Force default theme if matching is disabled
             return WidgetTheme.forTheme("default", themeMode: themeMode, systemIsDark: isDark)
         }
         

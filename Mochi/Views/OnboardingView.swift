@@ -1,12 +1,17 @@
 import SwiftUI
+import SwiftData
 
 struct OnboardingView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var settings = SettingsManager.shared
     
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
+    
     @Environment(\.colorScheme) var colorScheme
 
     @State private var currentPage = 0
+    @State private var hasConfirmedRestoreChoice = false
     
     // Animation states
     @State private var logoScale: CGFloat = 0.8
@@ -16,7 +21,13 @@ struct OnboardingView: View {
     @State private var breathingScale: CGFloat = 1.0
     @State private var buttonAppeared = false
     
-    private let totalPages = 4
+    private var totalPages: Int {
+        shouldShowRestorePage ? 5 : 4
+    }
+    
+    private var shouldShowRestorePage: Bool {
+        !items.isEmpty && !hasConfirmedRestoreChoice
+    }
     
     // Colors
     private var isDarkMode: Bool { colorScheme == .dark }
@@ -54,6 +65,9 @@ struct OnboardingView: View {
                 
                 // Page Content
                 TabView(selection: $currentPage) {
+                    if shouldShowRestorePage {
+                        restorePage.tag(-1)
+                    }
                     welcomePage.tag(0)
                     valuePropPage.tag(1)
                     trackSpendingPage.tag(2)
@@ -64,6 +78,9 @@ struct OnboardingView: View {
             }
         }
         .onAppear {
+            if shouldShowRestorePage {
+                currentPage = -1
+            }
             startAnimations()
         }
         .onChange(of: currentPage) { _, _ in
@@ -75,7 +92,8 @@ struct OnboardingView: View {
     
     private var pageIndicator: some View {
         HStack(spacing: 6) {
-            ForEach(0..<totalPages, id: \.self) { index in
+            let pageRange = shouldShowRestorePage ? Array(-1...3) : Array(0...3)
+            ForEach(pageRange, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 4)
                     .fill(currentPage >= index ? textPrimary : textPrimary.opacity(0.12))
                     .frame(width: currentPage == index ? 20 : 6, height: 6)
@@ -121,10 +139,12 @@ struct OnboardingView: View {
             
             // Button
             nextButton(text: "Continue")
+                .accessibilityIdentifier("onboarding_continue_button")
                 .opacity(buttonAppeared ? 1 : 0)
                 .offset(y: buttonAppeared ? 0 : 20)
             
             skipButton
+                .accessibilityIdentifier("onboarding_skip_button")
                 .opacity(buttonAppeared ? 1 : 0)
         }
         .padding(.horizontal, 32)
@@ -252,6 +272,97 @@ struct OnboardingView: View {
         PaywallView(
             isEmbedded: true,
             onComplete: { completeOnboarding() }
+        )
+    }
+
+    // MARK: - Restore Page
+    
+    private var restorePage: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            
+            // Title
+            Text("Welcome back.")
+                .font(.system(size: 40, weight: .medium, design: .monospaced))
+                .foregroundColor(textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 24)
+            
+            // Icon
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 60, weight: .light))
+                .foregroundColor(accentGreen)
+                .padding(.bottom, 32)
+            
+            // Description
+            Text("We found \(items.count) past transactions on your device. Would you like to keep them?")
+                .font(.system(size: 16, weight: .regular, design: .monospaced))
+                .foregroundColor(textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(6)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 48)
+            
+            Spacer()
+            
+            // Choices
+            VStack(spacing: 16) {
+                Button(action: {
+                    HapticManager.shared.success()
+                    withAnimation {
+                        hasConfirmedRestoreChoice = true
+                        currentPage = 0
+                    }
+                }) {
+                    Text("Restore My History")
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        .foregroundColor(isDarkMode ? .black : .white)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(accentGreen)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                
+                Button(action: {
+                    HapticManager.shared.softSquish()
+                    deleteAllData()
+                    withAnimation {
+                        hasConfirmedRestoreChoice = true
+                        currentPage = 0
+                    }
+                }) {
+                    Text("Start Fresh")
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        .foregroundColor(textPrimary)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(textPrimary.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(SquishyButtonStyle(isDoneButton: false))
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 56)
+        }
+    }
+    
+    private func deleteAllData() {
+        for item in items {
+            modelContext.delete(item)
+        }
+        // Also reset widgets
+        WidgetDataManager.shared.updateWidgetData(
+            todayTotal: 0,
+            yesterdayTotal: 0,
+            lastTransaction: nil,
+            lastTransactionNote: nil,
+            currencySymbol: settings.currencySymbol,
+            colorTheme: settings.colorTheme,
+            themeMode: settings.themeMode,
+            isPro: SubscriptionManager.shared.isPro,
+            dayStartHour: settings.dayStartHour,
+            dayStartMinute: settings.dayStartMinute
         )
     }
 

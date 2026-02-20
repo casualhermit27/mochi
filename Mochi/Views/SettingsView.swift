@@ -1,5 +1,8 @@
 import SwiftUI
 import MessageUI
+import SwiftData
+import WidgetKit
+import RevenueCatUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
@@ -69,6 +72,7 @@ struct SettingsView: View {
                                 .background(dynamicText.opacity(0.08))
                                 .clipShape(Circle())
                         }
+                        .accessibilityIdentifier("close_settings_button")
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
@@ -88,6 +92,7 @@ struct SettingsView: View {
                                 }) {
                                     MembershipCard()
                                 }
+                                .accessibilityIdentifier("membership_card")
                                 .buttonStyle(.plain)
                             }
                             .padding(.bottom, 8)
@@ -96,18 +101,21 @@ struct SettingsView: View {
                             NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode == "amoled" ? "OLED" : settings.themeMode.capitalized, dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("appearance_row")
                             .padding(.horizontal, 20)
                             
                             // 2. Logging
                             NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("logging_row")
                             .padding(.horizontal, 20)
                             
                             // 2.1 Speed Dial
                             NavigationLink(destination: SpeedDialSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
                                 MenuRow(icon: "bolt.fill", title: "Speed Dial", value: "", dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("speed_dial_row")
                             .padding(.horizontal, 20)
                             
                             // 2.1 Data & Export
@@ -115,6 +123,7 @@ struct SettingsView: View {
                                 NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                     MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
                                 }
+                                .accessibilityIdentifier("export_row")
                                 .padding(.horizontal, 20)
                             } else {
                                 Button(action: {
@@ -131,18 +140,21 @@ struct SettingsView: View {
                             NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "bell.fill", title: "Notifications", value: settings.dailyNotificationEnabled ? "On" : "Off", dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("notifications_row")
                             .padding(.horizontal, 20)
                             
                             // 4. Feedback
                             NavigationLink(destination: FeedbackSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "waveform", title: "Feedback", value: settings.hapticsEnabled ? "On" : "Off", dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("feedback_row")
                             .padding(.horizontal, 20)
                             
                             // 5. About (Separated Rhythm)
                             NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
                                 MenuRow(icon: "info.circle.fill", title: "About", value: "v1.0.0", dynamicText: dynamicText)
                             }
+                            .accessibilityIdentifier("about_row")
                             .padding(.top, 16) // Extra rhythm separation
                             .padding(.horizontal, 20)
                             
@@ -165,6 +177,25 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $subscription.showPaywall) {
             PaywallView()
+        }
+        .sheet(isPresented: $subscription.showCustomerCenter) {
+            SubscriptionCustomerCenterView()
+        }
+        .fullScreenCover(item: $notificationManager.activeReflection) { data in
+            ReflectionView(
+                data: data,
+                onDismiss: {
+                    notificationManager.activeReflection = nil
+                },
+                onViewHistory: {
+                    notificationManager.activeReflection = nil
+                    // Trigger history on main screen
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        notificationManager.shouldOpenHistory = true
+                        dismiss() // Dismiss Settings to show History
+                    }
+                }
+            )
         }
         .preferredColorScheme(isNightTime ? .dark : .light)
     }
@@ -250,6 +281,7 @@ struct AppearanceSettingsView: View {
                                     .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
                             )
                     }
+                    .accessibilityIdentifier("back_button")
                     
                     Spacer()
                     
@@ -323,6 +355,7 @@ struct AppearanceSettingsView: View {
                                     .font(.system(size: 16, weight: .medium, design: .rounded))
                                     .foregroundColor(dynamicText)
                             }
+                            .accessibilityIdentifier("widget_match_theme_toggle")
                             .tint(accentColor)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
@@ -350,9 +383,25 @@ struct AppearanceSettingsView: View {
 
 struct LoggingSettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Item.timestamp, order: .reverse) var items: [Item]
+    
     let dynamicText: Color
     let dynamicBackground: Color
     let isNightTime: Bool
+
+    var dailyTotal: Double {
+        let currentRitualDay = settings.getRitualDay(for: Date())
+        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
+        return todayItems.reduce(0) { $0 + $1.amount }
+    }
+    
+    var yesterdayTotal: Double {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        let yesterdayRitualDay = settings.getRitualDay(for: yesterday)
+        let yesterdayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == yesterdayRitualDay }
+        return yesterdayItems.reduce(0) { $0 + $1.amount }
+    }
     
     var accentColor: Color {
         if settings.colorTheme != "default" {
@@ -461,6 +510,23 @@ struct LoggingSettingsView: View {
                             .padding(.vertical, 12)
                             .background(dynamicText.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .onChange(of: settings.dayStartDate) { _, _ in
+                            // Sync reset settings to widget immediately
+                            let lastItem = items.first
+                            WidgetDataManager.shared.updateWidgetData(
+                                todayTotal: dailyTotal,
+                                yesterdayTotal: yesterdayTotal,
+                                lastTransaction: lastItem?.amount,
+                                lastTransactionNote: lastItem?.note,
+                                currencySymbol: settings.currencySymbol,
+                                colorTheme: settings.colorTheme,
+                                themeMode: settings.themeMode,
+                                isPro: SubscriptionManager.shared.isFullAccess,
+                                dayStartHour: settings.dayStartHour,
+                                dayStartMinute: settings.dayStartMinute
+                            )
+                            WidgetCenter.shared.reloadAllTimelines()
                         }
                     }
                     .padding(.top, 12)
@@ -900,7 +966,7 @@ struct AboutSettingsView: View {
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
                                         .foregroundColor(dynamicText)
                                     Spacer()
-                                    Text(subscription.statusLabel)
+                                    Text(subscription.detailedStatus)
                                         .font(.system(size: 14, weight: .medium, design: .monospaced))
                                         .foregroundColor(subscription.isPro ? accentColor : dynamicText.opacity(0.4))
                                 }
@@ -981,14 +1047,17 @@ struct MembershipCard: View {
     }
     
     private var title: String {
-        if subscription.isPro { return "Mochi+ Active" }
-        if subscription.isSoftTrial { return "Mochi+ Trial Active" }
-        return "Upgrade to Mochi+"
+        return subscription.statusLabel == "Free" ? "Upgrade to Mochi+" : subscription.statusLabel
     }
     
     private var subtitle: String {
-        if subscription.isPro { return "Thank you for your support! ♥️" }
-        if subscription.isFullAccess { return "Mochi is yours to enjoy" }
+        if subscription.isPro { 
+            if subscription.isOnTrial { return "Free trial ending soon" }
+            if let pid = subscription.activeProductId, pid.contains("lifetime") {
+                return "Welcome to the family"
+            }
+            return "Thank you for supporting Mochi! ♥️" 
+        }
         return "Unlock history, themes & widgets"
     }
 }

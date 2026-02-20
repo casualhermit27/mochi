@@ -10,23 +10,61 @@ import SwiftUI
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), configuration: ConfigurationAppIntent())
+        SimpleEntry(
+            date: Date(),
+            configuration: ConfigurationAppIntent(),
+            todayTotal: 0,
+            yesterdayTotal: 0,
+            lastTransaction: 0,
+            lastTransactionNote: "",
+            currencySymbol: "$",
+            isPro: false,
+            colorTheme: "default",
+            themeMode: "auto"
+        )
     }
 
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
-        // Fetch real data for snapshot or use dummy data
-        SimpleEntry(date: Date(), configuration: configuration)
+        let data = WidgetDataManager.shared
+        return SimpleEntry(
+            date: Date(),
+            configuration: configuration,
+            todayTotal: data.todayTotal,
+            yesterdayTotal: data.yesterdayTotal,
+            lastTransaction: data.lastTransaction,
+            lastTransactionNote: data.lastTransactionNote,
+            currencySymbol: data.currencySymbol,
+            isPro: data.isPro,
+            colorTheme: data.colorTheme,
+            themeMode: data.themeMode
+        )
     }
     
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
-        // The widget just needs to update when the main app tells it to relad, 
-        // or periodically to keep the "Yesterday" date accurate.
-        // We'll update every 15 minutes roughly.
         let currentDate = Date()
-        let refreshDate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate) ?? currentDate.addingTimeInterval(900)
+        let data = WidgetDataManager.shared
         
-        let entry = SimpleEntry(date: currentDate, configuration: configuration)
-        return Timeline(entries: [entry], policy: .after(refreshDate))
+        // Use a 15-minute heartbeat to keep things fresh
+        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate) ?? currentDate.addingTimeInterval(900)
+        
+        // This call to 'todayTotal' / 'yesterdayTotal' triggers 'checkAndResetStaleData'
+        let todayVal = data.todayTotal
+        let yesterdayVal = data.yesterdayTotal
+        
+        let entry = SimpleEntry(
+            date: currentDate,
+            configuration: configuration,
+            todayTotal: todayVal,
+            yesterdayTotal: yesterdayVal,
+            lastTransaction: data.lastTransaction,
+            lastTransactionNote: data.lastTransactionNote,
+            currencySymbol: data.currencySymbol,
+            isPro: data.isPro,
+            colorTheme: data.colorTheme,
+            themeMode: data.themeMode
+        )
+        
+        return Timeline(entries: [entry], policy: .after(nextRefresh))
     }
 }
 
@@ -34,46 +72,29 @@ struct Provider: AppIntentTimelineProvider {
 struct SimpleEntry: TimelineEntry {
     let date: Date
     let configuration: ConfigurationAppIntent
+    
+    let todayTotal: Double
+    let yesterdayTotal: Double
+    let lastTransaction: Double
+    let lastTransactionNote: String
+    let currencySymbol: String
+    let isPro: Bool
+    let colorTheme: String
+    let themeMode: String
 }
 
-// Data model for the widget
 struct MochiWidgetEntryView : View {
     var entry: Provider.Entry
     @Environment(\.colorScheme) var colorScheme
-    
-    // Read data from Shared UserDefaults
-    var dataManager = WidgetDataManager.shared
-    
-    var todayTotal: Double {
-        dataManager.todayTotal
-    }
-    
-    var yesterdayTotal: Double {
-        dataManager.yesterdayTotal
-    }
-    
-    var lastTransaction: Double {
-        dataManager.lastTransaction
-    }
-    
-    var lastTransactionNote: String {
-        dataManager.lastTransactionNote
-    }
-    
-    var currencySymbol: String {
-        dataManager.currencySymbol
-    }
-    
-    // Date Formatter
-    var dateString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d" // e.g. "JAN 18"
-        return formatter.string(from: Date()).uppercased()
-    }
-    
+    @Environment(\.widgetFamily) var family
+
     // Theme Colors
     var theme: WidgetDataManager.WidgetTheme {
-        dataManager.getWidgetTheme(isDark: colorScheme == .dark)
+        WidgetDataManager.WidgetTheme.forTheme(
+            entry.colorTheme,
+            themeMode: entry.themeMode,
+            systemIsDark: colorScheme == .dark
+        )
     }
 
     var body: some View {
@@ -93,12 +114,11 @@ struct MochiWidgetEntryView : View {
                         .foregroundColor(.secondary)
                     
                     HStack(spacing: 1) {
-                        Text(currencySymbol)
+                        Text(entry.currencySymbol)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(.secondary)
                         
-                        // Use abbreviated number here always for space
-                        Text(formatAmount(todayTotal))
+                        Text(formatAmount(entry.todayTotal))
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(.primary)
                     }
@@ -107,7 +127,6 @@ struct MochiWidgetEntryView : View {
                 Spacer()
             }
             .containerBackground(for: .widget) {
-                 // System provides background
                  Color.clear
             }
             
@@ -119,11 +138,11 @@ struct MochiWidgetEntryView : View {
                 
                 // Top Left: Date (Month + Day)
                 HStack(spacing: 4) {
-                    Text(Date().formatted(.dateTime.month()).uppercased())
+                    Text(entry.date.formatted(.dateTime.month()).uppercased())
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.text.opacity(0.6))
                     
-                    Text(Date().formatted(.dateTime.day()))
+                    Text(entry.date.formatted(.dateTime.day()))
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.text)
                 }
@@ -132,17 +151,17 @@ struct MochiWidgetEntryView : View {
                 
                 // Top Right: Last Transaction
                 VStack(alignment: .trailing, spacing: 2) {
-                    if lastTransaction != 0 {
-                        Text(lastTransactionNote.isEmpty ? "LAST" : lastTransactionNote.uppercased())
+                    if entry.lastTransaction != 0 {
+                        Text(entry.lastTransactionNote.isEmpty ? "LAST" : entry.lastTransactionNote.uppercased())
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.text.opacity(0.5))
                             .lineLimit(1)
                         
-                        let sign = lastTransaction > 0 ? "+" : "-"
-                        let absAmount = abs(lastTransaction)
+                        let sign = entry.lastTransaction > 0 ? "+" : "-"
+                        let absAmount = abs(entry.lastTransaction)
                         
                         HStack(spacing: 2) {
-                            Text("\(sign) \(currencySymbol)")
+                            Text("\(sign) \(entry.currencySymbol)")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundColor(theme.text.opacity(0.5))
                             
@@ -164,12 +183,12 @@ struct MochiWidgetEntryView : View {
                         .padding(.bottom, 2)
                     
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(currencySymbol)
+                        Text(entry.currencySymbol)
                             .font(.system(size: 28, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.text.opacity(0.5))
                             .padding(.trailing, 2)
                         
-                        Text(formatAmount(todayTotal))
+                        Text(formatAmount(entry.todayTotal))
                             .font(.system(size: 48, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.text)
                     }
@@ -185,8 +204,6 @@ struct MochiWidgetEntryView : View {
             }
         }
     }
-    
-    @Environment(\.widgetFamily) var family
     
     func formatAmount(_ amount: Double) -> String {
         // Abbreviate for small widgets (SystemSmall, LockScreen widgets) and large numbers (>= 1,000)
@@ -281,5 +298,16 @@ extension ConfigurationAppIntent {
 #Preview(as: .systemSmall) {
     MochiWidget()
 } timeline: {
-    SimpleEntry(date: .now, configuration: .smiley)
+    SimpleEntry(
+        date: .now,
+        configuration: .smiley,
+        todayTotal: 222,
+        yesterdayTotal: 100,
+        lastTransaction: 222,
+        lastTransactionNote: "Lunch",
+        currencySymbol: "₹",
+        isPro: true,
+        colorTheme: "default",
+        themeMode: "auto"
+    )
 }

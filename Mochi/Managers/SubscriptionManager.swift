@@ -11,7 +11,7 @@ final class SubscriptionManager: ObservableObject {
     
     // RevenueCat Configuration
     private static let apiKey = "appl_IzgFGpKnIBDJhCTKGzmyryLRegh"
-    private static let entitlementID = "Mochi +"
+    private static let entitlementID = "Mochi+"
     
     private var delegate: RevenueCatDelegate?
     
@@ -23,14 +23,9 @@ final class SubscriptionManager: ObservableObject {
     /// Current RevenueCat offering for the paywall
     @Published var currentOffering: Offering?
     
-    /// Whether the user has full access (paid subscription OR within 3-day soft trial)
+    /// Whether the user has full access (paid subscription or Apple Free Trial)
     var isFullAccess: Bool {
-        return isPro || SettingsManager.shared.daysSinceFirstUse < 3
-    }
-    
-    /// Whether the user is in the 3-day soft trial period
-    var isSoftTrial: Bool {
-        return !isPro && SettingsManager.shared.daysSinceFirstUse < 3
+        return isPro
     }
     
     /// Whether the user is on a free trial (subset of isPro)
@@ -38,6 +33,9 @@ final class SubscriptionManager: ObservableObject {
     
     /// Days remaining in trial (0 if not on trial)
     @Published var trialDaysRemaining: Int = 0
+    
+    /// The specific product ID that granted access (for Monthly/Yearly/Lifetime labeling)
+    @Published var activeProductId: String? = nil
     
     // MARK: - UI Presentation
     
@@ -80,11 +78,17 @@ final class SubscriptionManager: ObservableObject {
     }
     
     func updateStatus(from customerInfo: CustomerInfo) {
-        let entitlement = customerInfo.entitlements[Self.entitlementID]
-        let isActive = entitlement?.isActive == true
+        // 1. Universal Check: If ANY entitlement is active, the user is Pro.
+        // This solves issues where the Dashboard ID might be "Pro" but code expects "Mochi+".
+        let hasAnyActiveEntitlement = !customerInfo.entitlements.active.isEmpty
+        self.isPro = hasAnyActiveEntitlement
         
-        // Single source of truth: entitlement active = premium
-        self.isPro = isActive
+        // 2. Get the specific entitlement for metadata (expiration, product ID)
+        // Prefer "Mochi+", but fall back to the first active one found.
+        let entitlement = customerInfo.entitlements[Self.entitlementID] ?? customerInfo.entitlements.active.first?.value
+        
+        self.activeProductId = entitlement?.productIdentifier
+        let isActive = hasAnyActiveEntitlement
         
         // Detect trial state (for optional UI badge, NOT for gating)
         if isActive, let entitlement = entitlement {
@@ -152,7 +156,7 @@ final class SubscriptionManager: ObservableObject {
     // MARK: - Diagnostic
     
     func verifyStoreKitConfiguration() async {
-        let commonIds = ["com.mochi.plus.lifetime", "com.mochi.plus.monthly", "com.mochi.plus.annual"]
+        let commonIds = ["com.harsha.mochi.lifetime", "com.harsha.mochi.monthly", "com.harsha.mochi.annual"]
         
         do {
             let products = try await Product.products(for: commonIds)
@@ -201,19 +205,34 @@ final class SubscriptionManager: ObservableObject {
     
     // MARK: - Status Label (for Settings / About)
     
+    // MARK: - Status Label (for Settings / About)
+    
     var statusLabel: String {
         if isPro {
-            if isOnTrial { return "Free Trial · \(trialDaysRemaining)d left" }
+            if isOnTrial { return "Trial · \(trialDaysRemaining)d left" }
+            
+            if let pid = activeProductId {
+                if pid.contains("lifetime") { return "You own it forever" }
+                if pid.contains("annual") || pid.contains("yearly") { return "Mochi+ Yearly" }
+                if pid.contains("monthly") { return "Mochi+ Monthly" }
+            }
             return "Mochi+ Active"
         }
+        return "Free"
+    }
+    
+    /// Detailed status for About section
+    var detailedStatus: String {
+        if !isPro { return "Free Version" }
+        if isOnTrial { return "Free Trial (\(trialDaysRemaining) days remaining)" }
         
-        let daysUsed = SettingsManager.shared.daysSinceFirstUse
-        if daysUsed < 3 {
-            let left = 3 - daysUsed
-            return left == 0 ? "Trial Active · Last day!" : "Trial Active · \(left)d left"
+        if let pid = activeProductId {
+            if pid.contains("lifetime") { return "It's yours forever" }
+            if pid.contains("annual") || pid.contains("yearly") { return "Mochi+ Yearly" }
+            if pid.contains("monthly") { return "Mochi+ Monthly" }
         }
         
-        return "Free"
+        return "Mochi+ Active"
     }
 }
 

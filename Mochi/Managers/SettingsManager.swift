@@ -96,9 +96,10 @@ class SettingsManager: ObservableObject {
     init() {
         self.selectedPaymentMethodId = UserDefaults.standard.string(forKey: "selectedPaymentMethodId") ?? PaymentMethod.defaultCash.id.uuidString
         
-        // Initialize first launch date if not set
+        // Initialize first launch date if not set (for analytics only, not gating)
         if firstLaunchDate == 0 {
-            firstLaunchDate = Date().timeIntervalSince1970
+            let now = Date().timeIntervalSince1970
+            firstLaunchDate = now
         }
     }
     
@@ -272,6 +273,13 @@ class SettingsManager: ObservableObject {
             }
         }
         return Locale.autoupdatingCurrent.currencySymbol ?? "$"
+    }
+    
+    var activeCurrencyCode: String {
+        if !customCurrencyCode.isEmpty {
+            return customCurrencyCode
+        }
+        return Locale.autoupdatingCurrent.currency?.identifier ?? "USD"
     }
     
     // Currency Model
