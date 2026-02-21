@@ -58,6 +58,9 @@ class SettingsManager: ObservableObject {
         return diff
     }
     
+    // Cloud Sync
+    @AppStorage("iCloudSyncEnabled") var iCloudSyncEnabled: Bool = false
+    
     // MARK: - Speed Dial
     @AppStorage("speedDialPresetsData") var speedDialPresetsData: Data = Data()
     
@@ -100,6 +103,10 @@ class SettingsManager: ObservableObject {
         if firstLaunchDate == 0 {
             let now = Date().timeIntervalSince1970
             firstLaunchDate = now
+        }
+        
+        if iCloudSyncEnabled {
+            CloudSyncManager.shared.startSyncing()
         }
     }
     
@@ -354,3 +361,135 @@ class SettingsManager: ObservableObject {
         }
     }
 }
+
+// MARK: - AppStorage Cloud Syncer
+
+class CloudSyncManager: NSObject {
+    static let shared = CloudSyncManager()
+    
+    private let syncedKeys = [
+        "themeMode", "colorTheme", "customCurrencyCode", "widgetMatchTheme",
+        "dayStartHour", "dayStartMinute", 
+        "dailyNotificationEnabled", "notificationTime", "weeklyNotificationEnabled", "weeklyNotificationWeekday",
+        "hapticsEnabled", "soundsEnabled",
+        "speedDialPresetsData", "paymentMethodsData", "selectedPaymentMethodId"
+    ]
+    
+    private let store = NSUbiquitousKeyValueStore.default
+    private let defaults = UserDefaults.standard
+    private var isSyncing = false
+    private var isProcessingRemoteChanges = false
+    private var localCache: [String: Any] = [:]
+    
+    func startSyncing() {
+        guard !isSyncing else { return }
+        isSyncing = true
+        
+        // Listen to remote changes
+        NotificationCenter.default.addObserver(self, selector: #selector(iCloudDataDidChange), name: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: store)
+        
+        // Listen to local changes
+        NotificationCenter.default.addObserver(self, selector: #selector(localDataDidChange), name: UserDefaults.didChangeNotification, object: nil)
+        
+        // Trigger implicit sync to grab latest data from Apple
+        store.synchronize()
+        
+        isProcessingRemoteChanges = true
+        var needsRefresh = false
+        
+        // Force hydration on launch: pull from iCloud if it exists. Cache local to prevent overwrite empty remote
+        for key in syncedKeys {
+            if let remoteValue = store.object(forKey: key) {
+                let localValue = defaults.object(forKey: key)
+                if !areEqual(localValue, remoteValue) {
+                    defaults.set(remoteValue, forKey: key)
+                    needsRefresh = true
+                }
+            }
+            localCache[key] = defaults.object(forKey: key)
+        }
+        
+        if needsRefresh {
+            DispatchQueue.main.async {
+                SettingsManager.shared.objectWillChange.send()
+            }
+        }
+        isProcessingRemoteChanges = false
+    }
+    
+    func forceRestore() {
+        // Trigger implicit sync to grab latest data from Apple
+        store.synchronize()
+        
+        isProcessingRemoteChanges = true
+        var needsRefresh = false
+        for key in syncedKeys {
+            if let remoteValue = store.object(forKey: key) {
+                let localValue = defaults.object(forKey: key)
+                if !areEqual(localValue, remoteValue) {
+                    defaults.set(remoteValue, forKey: key)
+                    needsRefresh = true
+                }
+            }
+            localCache[key] = defaults.object(forKey: key)
+        }
+        
+        if needsRefresh {
+            DispatchQueue.main.async {
+                SettingsManager.shared.objectWillChange.send()
+            }
+        }
+        isProcessingRemoteChanges = false
+    }
+    
+    @objc private func iCloudDataDidChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let changedKeys = userInfo[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] else { return }
+        
+        isProcessingRemoteChanges = true
+        var needsRefresh = false
+        for key in changedKeys where syncedKeys.contains(key) {
+            let newValue = store.object(forKey: key)
+            defaults.set(newValue, forKey: key)
+            localCache[key] = newValue
+            needsRefresh = true
+        }
+        
+        if needsRefresh {
+            DispatchQueue.main.async {
+                SettingsManager.shared.objectWillChange.send()
+            }
+        }
+        isProcessingRemoteChanges = false
+    }
+    
+    @objc private func localDataDidChange(_ notification: Notification) {
+        guard defaults.bool(forKey: "iCloudSyncEnabled") else { return }
+        guard !isProcessingRemoteChanges else { return }
+        
+        var didPush = false
+        for key in syncedKeys {
+            let localValue = defaults.object(forKey: key)
+            let cachedValue = localCache[key]
+            
+            // Loop protection: only push if data actually changed from cache
+            if !areEqual(localValue, cachedValue) {
+                store.set(localValue, forKey: key)
+                localCache[key] = localValue // update cache
+                didPush = true
+            }
+        }
+        if didPush { 
+            store.synchronize() 
+        }
+    }
+    
+    private func areEqual(_ a: Any?, _ b: Any?) -> Bool {
+        if a == nil && b == nil { return true }
+        if let x = a as? String, let y = b as? String { return x == y }
+        if let x = a as? Data, let y = b as? Data { return x == y }
+        if let x = a as? NSNumber, let y = b as? NSNumber { return x == y }
+        return false // If they are not castable exactly this way or mismatch, assume not equal
+    }
+}
+

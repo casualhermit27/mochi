@@ -59,6 +59,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E54BAB402F4864D500802A05 /* Exceptions for "Mochi" folder in "Mochi" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C316FA822F1BEC7400B7E257 /* Mochi */;
+		};
 		E590D2242F1BF9A400ACC0CD /* Exceptions for "MochiWidget" folder in "MochiWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -71,6 +78,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C316FA852F1BEC7400B7E257 /* Mochi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E54BAB402F4864D500802A05 /* Exceptions for "Mochi" folder in "Mochi" target */,
+			);
 			path = Mochi;
 			sourceTree = "<group>";
 		};
@@ -463,10 +473,11 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Mochi/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLSchemes =     (\n        mochi\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -503,10 +514,11 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Mochi/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLSchemes =     (\n        mochi\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -54,6 +54,24 @@ struct PaywallView: View {
         return Color(red: 0.35, green: 0.65, blue: 0.55)
     }
     
+    // Dynamic distinct colors per plan
+    private func packageAccent(for type: PackageType) -> Color {
+        if settings.colorTheme != "default" {
+            switch type {
+            case .annual: return currentTheme.accent
+            case .monthly: return currentTheme.accent.opacity(isNightTime ? 0.7 : 0.6)
+            case .lifetime: return currentTheme.accent.opacity(isNightTime ? 0.6 : 0.4)
+            default: return currentTheme.accent
+            }
+        }
+        switch type {
+        case .annual: return Color(red: 0.35, green: 0.65, blue: 0.55)
+        case .monthly: return isNightTime ? Color.mochiBlueDark : Color(red: 0.40, green: 0.55, blue: 0.70)
+        case .lifetime: return isNightTime ? Color.mochiRose : Color(red: 0.70, green: 0.45, blue: 0.50)
+        default: return Color(red: 0.35, green: 0.65, blue: 0.55)
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Dynamic Background
@@ -225,7 +243,7 @@ struct PaywallView: View {
                                     package: package,
                                     isSelected: selectedPackage?.identifier == package.identifier,
                                     textColor: dynamicText,
-                                    accentColor: dynamicAccent,
+                                    accentColor: packageAccent(for: package.packageType),
                                     isNightTime: isNightTime
                                 ) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -238,12 +256,32 @@ struct PaywallView: View {
                     }
                     .padding(.horizontal, 24)
                     
+                    if let pkg = selectedPackage, !subscription.isPro {
+                        let eligibility = subscription.introEligibilities[pkg.storeProduct.productIdentifier]?.status
+                        let isEligible = (eligibility == .eligible || eligibility == .unknown)
+                        if !isEligible {
+                            Text("TRIAL COMPLETED")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .tracking(1)
+                                .foregroundColor(Color.red.opacity(0.8))
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .background(Color.red.opacity(0.1))
+                                .clipShape(Capsule())
+                                .padding(.top, 0)
+                                .padding(.bottom, 6)
+                        } else {
+                            Spacer().frame(height: 0)
+                        }
+                    } else {
+                        Spacer().frame(height: 0)
+                    }
+                    
                     // Subscribe Button or Manage Button
                     Button(action: subscribeTapped) {
                         HStack {
                             if isLoading {
-                                ProgressView()
-                                    .tint(isNightTime ? Color.black : Color.white)
+                                MochiSpinner(size: 28)
                             } else {
                                 Text(buttonLabel)
                                     .font(.system(size: 17, weight: .bold, design: .monospaced))
@@ -252,18 +290,59 @@ struct PaywallView: View {
                         .foregroundColor(isNightTime ? Color.black : Color.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(dynamicAccent)
+                        .background(selectedPackage != nil ? packageAccent(for: selectedPackage!.packageType) : dynamicAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .disabled(isLoading || (selectedPackage == nil && !subscription.isFullAccess))
                     .padding(.horizontal, 24)
                     
+                    if !subscription.isFullAccess {
+                        Button(action: restoreTapped) {
+                            if isLoading {
+                                MochiSpinner(size: 16)
+                            } else {
+                                Text("Restore Purchases")
+                            }
+                        }
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(dynamicText.opacity(0.6))
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(dynamicText.opacity(0.04))
+                        .clipShape(Capsule())
+                        .disabled(isLoading)
+                        .padding(.top, 8)
+                    }
+                    
+                    // Skip button to drop to free tier in onboarding
+                    if isEmbedded && !subscription.isPro {
+                        Button(action: {
+                            HapticManager.shared.softSquish()
+                            if let onComplete {
+                                onComplete()
+                            } else {
+                                dismiss()
+                            }
+                        }) {
+                            Text("Continue Free Version")
+                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                .foregroundColor(dynamicText.opacity(0.4))
+                                .padding(.bottom, 2)
+                                .overlay(
+                                    Rectangle()
+                                        .frame(height: 1)
+                                        .foregroundColor(dynamicText.opacity(0.2)),
+                                    alignment: .bottom
+                                )
+                        }
+                        .padding(.top, 6)
+                        .padding(.bottom, 4)
+                    }
+                    
                     // Fine Print (Only show when not in trial)
                     if !subscription.isFullAccess {
                         VStack(spacing: 12) {
                             HStack(spacing: 12) {
-                                Button("Restore") { restoreTapped() }
-                                Text("·")
                                 Link("Terms", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                                 Text("·")
                                 Link("Privacy", destination: URL(string: "https://mochi-privacy-policy.vercel.app/")!)
@@ -278,11 +357,6 @@ struct PaywallView: View {
                         .padding(.bottom, isEmbedded ? 8 : 32)
                     } else {
                         Spacer().frame(height: isEmbedded ? 8 : 32)
-                    }
-                    
-                    // Skip button (Not needed in onboarding as we have Start Trial)
-                    if isEmbedded {
-                        Spacer().frame(height: 24)
                     }
                 }
             }
@@ -310,12 +384,15 @@ struct PaywallView: View {
     }
     
     private var buttonLabel: String {
-        if subscription.isPro { return "Manage Subscription" }
+        if subscription.isPro { return isEmbedded ? "Active · Continue" : "Manage Subscription" }
         if subscription.isFullAccess && !isEmbedded { return "Got it" }
         
-        if isEmbedded { return "Start 3-Day Free Trial" }
         guard let pkg = selectedPackage else { return "Select a Plan" }
-        if let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
+        
+        let eligibility = subscription.introEligibilities[pkg.storeProduct.productIdentifier]?.status
+        let isEligible = (eligibility == .eligible || eligibility == .unknown)
+        
+        if isEligible, let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
             return "Start \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Free Trial"
         } else {
             return "Get Mochi +"
@@ -324,23 +401,17 @@ struct PaywallView: View {
     
     private func subscribeTapped() {
         if subscription.isPro {
-            subscription.showCustomerCenter = true
+            if isEmbedded {
+                HapticManager.shared.selection()
+                if let onComplete { onComplete() } else { dismiss() }
+            } else {
+                subscription.showCustomerCenter = true
+            }
             return
         }
         
         if subscription.isFullAccess && !isEmbedded {
             dismiss()
-            return
-        }
-        
-        if isEmbedded {
-            // Direct Start Soft Trial
-            HapticManager.shared.rigidImpact()
-            if let onComplete {
-                onComplete()
-            } else {
-                dismiss()
-            }
             return
         }
         

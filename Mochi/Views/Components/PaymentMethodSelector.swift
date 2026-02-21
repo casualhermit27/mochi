@@ -107,6 +107,13 @@ struct PaymentMethodSelector: View {
                             Color.white
                         }
                     )
+                    .simultaneousGesture(
+                        DragGesture().onChanged { _ in
+                            if isNoteActive {
+                                isNoteFocused = false
+                            }
+                        }
+                    )
                 }
                 
                 // MARK: - Fixed Note Button (Top Layer)
@@ -133,9 +140,6 @@ struct PaymentMethodSelector: View {
                                 .submitLabel(.done)
                                 .onSubmit {
                                     isNoteFocused = false
-                                    if note.isEmpty {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { isNoteActive = false }
-                                    }
                                 }
                             
                             if !note.isEmpty {
@@ -172,15 +176,26 @@ struct PaymentMethodSelector: View {
                                 isNoteFocused = true
                             }
                         }) {
-                            VStack(spacing: 4) {
-                                Image(systemName: note.isEmpty ? "pencil" : "text.bubble.fill")
-                                    .font(.system(size: 20, weight: note.isEmpty ? .regular : .bold))
-                                    .foregroundColor(note.isEmpty ? dynamicText : accentColor)
-                                
-                                Text(note.isEmpty ? "Note" : note)
-                                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                                    .foregroundColor(note.isEmpty ? dynamicText : accentColor)
-                                    .lineLimit(1)
+                            ZStack {
+                                if note.isEmpty {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 20, weight: .regular))
+                                            .foregroundColor(dynamicText)
+                                        
+                                        Text("Note")
+                                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText)
+                                    }
+                                } else {
+                                    Text(note)
+                                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                        .foregroundColor(dynamicText)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
+                                        .padding(.horizontal, 6)
+                                }
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background {
@@ -199,9 +214,10 @@ struct PaymentMethodSelector: View {
                 .frame(width: noteWidth)
                 .offset(x: noteVisualOffset) // Place it relative to center
                 .onChange(of: isNoteFocused) { _, focused in
-                    // "clicking outside text input area closes the note..."
-                    if !focused && note.isEmpty {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { isNoteActive = false }
+                    if !focused {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isNoteActive = false
+                        }
                     }
                 }
             }

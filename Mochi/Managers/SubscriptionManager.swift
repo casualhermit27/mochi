@@ -23,6 +23,9 @@ final class SubscriptionManager: ObservableObject {
     /// Current RevenueCat offering for the paywall
     @Published var currentOffering: Offering?
     
+    /// Intro pricing eligibility flags mapped by Apple Product ID
+    @Published var introEligibilities: [String: IntroEligibility] = [:]
+    
     /// Whether the user has full access (paid subscription or Apple Free Trial)
     var isFullAccess: Bool {
         return isPro
@@ -117,6 +120,12 @@ final class SubscriptionManager: ObservableObject {
         do {
             let offerings = try await Purchases.shared.offerings()
             self.currentOffering = offerings.current
+            
+            if let current = offerings.current {
+                let productIds = current.availablePackages.map { $0.storeProduct.productIdentifier }
+                let eligibilities = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: productIds)
+                self.introEligibilities = eligibilities
+            }
             
             var debug = "Offerings Source: RevenueCat\n"
             if let current = offerings.current {

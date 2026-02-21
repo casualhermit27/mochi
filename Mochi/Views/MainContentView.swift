@@ -16,8 +16,8 @@ struct MainContentView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.scenePhase) var scenePhase
     
-    @State private var showHistory = false
     @State private var showSettings = false
+    @State private var showHistory = false
     @State private var showToast = false
     @State private var toastMessage = "Mochi eaten."
     @State private var showAddedAnimation = false
@@ -183,7 +183,7 @@ struct MainContentView: View {
         return !SubscriptionManager.shared.isPro
     }
     
-    @AppStorage("hasDismissedTrialOverlay") private var hasDismissedTrialOverlay = false
+    @AppStorage("hasDismissedTrialOverlay") private var hasDismissedTrialOverlay = true
 
     var body: some View {
         GeometryReader { geometry in
@@ -210,15 +210,17 @@ struct MainContentView: View {
                     
                     Spacer()
                     
+
                     // Settings Button
                     Button(action: {
                         HapticManager.shared.softSquish()
                         showSettings = true
                     }) {
                         Image(systemName: "gearshape")
-                            .font(.system(size: 20, weight: .light))
+                            .font(.system(size: 24, weight: .light))
                             .foregroundColor(dynamicSecondary)
-                            .padding(.horizontal, 8)
+                            .padding(.leading, 8)
+                            .padding(.trailing, 8)
                             .padding(.vertical, 8)
                     }
                     .accessibilityIdentifier("settings_button")
@@ -393,6 +395,7 @@ struct MainContentView: View {
                 .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(32)
         }
+
         .sheet(isPresented: $showPaymentMethods) {
             NavigationStack {
                 PaymentMethodsView(dynamicText: dynamicText)
@@ -453,11 +456,17 @@ struct MainContentView: View {
         .onChange(of: settings.colorTheme) { _, _ in updateWidgetData() }
         .onChange(of: settings.themeMode) { _, _ in updateWidgetData() }
         .onChange(of: settings.customCurrencyCode) { _, _ in updateWidgetData() }
-        .onChange(of: subscription.isPro) { _, _ in updateWidgetData() }
+        .onChange(of: subscription.isPro) { oldValue, newValue in 
+            updateWidgetData()
+            // If user bought a sub or started a trial, reset their overlay flag.
+            // That way if the trial ends later, they will organically see the completed overlay.
+            if newValue == true {
+                hasDismissedTrialOverlay = false
+            }
+        }
         .onChange(of: notificationManager.shouldOpenHistory) { _, shouldOpen in
             if shouldOpen {
                 // Dimiss any other sheets to ensure History can open
-                showSettings = false
                 showPaymentMethods = false
                 subscription.showPaywall = false
                 
@@ -510,7 +519,10 @@ struct MainContentView: View {
                 currentInput.removeLast()
             } else {
                 currentInput = "0"
-                withAnimation { isInputActive = false }
+                withAnimation { 
+                    isInputActive = false 
+                    currentNote = ""
+                }
             }
         } else if key == "." {
             if !currentInput.contains(".") {
@@ -699,6 +711,7 @@ struct TrialCompletedOverlay: View {
     var onContinueFree: () -> Void
     
     @State private var animateContent = false
+    @State private var isRestoring = false
     
     var body: some View {
         ZStack {
@@ -792,15 +805,22 @@ struct TrialCompletedOverlay: View {
                         .buttonStyle(SquishyButtonStyle(isDoneButton: true))
                         
                         Button(action: {
+                            isRestoring = true
                             HapticManager.shared.softSquish()
                             Task {
                                 await SubscriptionManager.shared.restorePurchases()
+                                isRestoring = false
                             }
                         }) {
-                            Text("Restore Purchases")
-                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                .foregroundColor(dynamicText.opacity(0.4))
+                            if isRestoring {
+                                MochiSpinner(size: 22)
+                            } else {
+                                Text("Restore Purchases")
+                                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(dynamicText.opacity(0.4))
+                            }
                         }
+                        .disabled(isRestoring)
                     }
                     .padding(.horizontal, 32)
                     .opacity(animateContent ? 1 : 0)

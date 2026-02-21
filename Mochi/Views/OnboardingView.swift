@@ -20,6 +20,7 @@ struct OnboardingView: View {
     @State private var floatingOffset: CGFloat = 0
     @State private var breathingScale: CGFloat = 1.0
     @State private var buttonAppeared = false
+    @State private var isRestoringCloudData = false
     
     private var totalPages: Int {
         shouldShowRestorePage ? 5 : 4
@@ -53,29 +54,43 @@ struct OnboardingView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Simple background
-            creamBackground.ignoresSafeArea()
+        VStack(spacing: 0) {
+            Spacer() // Push the card to the bottom
             
             VStack(spacing: 0) {
                 // Page Indicator at top
                 pageIndicator
-                    .padding(.top, 20)
-                    .padding(.bottom, 8)
+                    .padding(.top, 24)
+                    .padding(.bottom, 24)
                 
                 // Page Content
-                TabView(selection: $currentPage) {
-                    if shouldShowRestorePage {
-                        restorePage.tag(-1)
+                Group {
+                    if currentPage == -1 {
+                        restorePage
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                    } else if currentPage == 0 {
+                        welcomePage
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                    } else if currentPage == 1 {
+                        trackSpendingPage
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                    } else if currentPage == 2 {
+                        paywallPage
+                            .frame(maxHeight: UIScreen.main.bounds.height * 0.75)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                    } else if currentPage == 3 {
+                        cloudSyncPage
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                     }
-                    welcomePage.tag(0)
-                    valuePropPage.tag(1)
-                    trackSpendingPage.tag(2)
-                    paywallPage.tag(3)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut(duration: 0.5), value: currentPage)
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentPage)
             }
+            .frame(maxWidth: .infinity)
+            .background(creamBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+            .shadow(color: Color.black.opacity(0.12), radius: 32, x: 0, y: 16)
         }
         .onAppear {
             if shouldShowRestorePage {
@@ -92,7 +107,7 @@ struct OnboardingView: View {
     
     private var pageIndicator: some View {
         HStack(spacing: 6) {
-            let pageRange = shouldShowRestorePage ? Array(-1...3) : Array(0...3)
+            let pageRange = shouldShowRestorePage ? Array(-1...2) : Array(0...2)
             ForEach(pageRange, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 4)
                     .fill(currentPage >= index ? textPrimary : textPrimary.opacity(0.12))
@@ -100,42 +115,40 @@ struct OnboardingView: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentPage)
             }
         }
+        .opacity(currentPage == 3 ? 0 : 1)
     }
     
     // MARK: - Page 1: Emotional Hook
     
     private var welcomePage: some View {
         VStack(spacing: 0) {
-            Spacer()
-            
             // Title with subtle animation
             Text("Calm spending\nawareness.")
-                .font(.system(size: 40, weight: .medium, design: .monospaced))
+                .font(.system(size: 34, weight: .medium, design: .monospaced))
                 .foregroundColor(textPrimary)
                 .multilineTextAlignment(.center)
                 .scaleEffect(breathingScale)
-                .padding(.bottom, 40)
+                .padding(.bottom, 32)
             
             // Logo
             Image("MochiLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 120, height: 120)
-                .clipShape(RoundedRectangle(cornerRadius: 28))
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 24))
                 .scaleEffect(logoScale)
                 .opacity(logoOpacity)
-                .padding(.bottom, 44)
+                .padding(.bottom, 32)
             
             // Description
             Text("Mochi helps you log expenses quickly\nwithout turning budgeting into work.")
-                .font(.system(size: 16, weight: .regular, design: .monospaced))
+                .font(.system(size: 15, weight: .regular, design: .monospaced))
                 .foregroundColor(textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(6)
                 .opacity(contentOpacity)
-                .padding(.horizontal, 20)
-            
-            Spacer()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 40)
             
             // Button
             nextButton(text: "Continue")
@@ -147,48 +160,11 @@ struct OnboardingView: View {
                 .accessibilityIdentifier("onboarding_skip_button")
                 .opacity(buttonAppeared ? 1 : 0)
         }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 56)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 48)
     }
     
-    // MARK: - Page 2: Value Prop
-    
-    private var valuePropPage: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            // Title
-            VStack(spacing: 16) {
-                Text("No budgets.\nNo stress.")
-                    .font(.system(size: 40, weight: .medium, design: .monospaced))
-                    .foregroundColor(textPrimary)
-                    .multilineTextAlignment(.center)
-                
-                 Text("Just track what you spend\nand move on with your day.")
-                    .font(.system(size: 16, weight: .regular, design: .monospaced))
-                    .foregroundColor(textSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(6)
-            }
-            .padding(.bottom, 40)
-            
-            // Phone mockup image (add "onboarding_screen2" to Assets)
-            Image("onboarding_screen2")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxHeight: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .padding(.horizontal, 40)
-            
-            Spacer()
-            
-            nextButton(text: "Continue")
-            
-            skipButton
-        }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 56)
-    }
+
     
     // MARK: - Page 3: Track Spending
     
@@ -199,17 +175,13 @@ struct OnboardingView: View {
                 Text("Good morning.")
                     .font(.system(size: 15, weight: .medium, design: .monospaced))
                     .foregroundColor(textSecondary)
-                
                 Spacer()
-                
                 Image(systemName: "clock")
                     .font(.system(size: 20, weight: .light))
                     .foregroundColor(textSecondary)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 16)
-            
-            Spacer()
+            .padding(.bottom, 32)
             
             // Amount Display
             HStack(spacing: 2) {
@@ -218,7 +190,7 @@ struct OnboardingView: View {
                     .foregroundColor(textPrimary.opacity(0.35))
                 
                 Text("42")
-                    .font(.system(size: 72, weight: .medium, design: .monospaced))
+                    .font(.system(size: 64, weight: .medium, design: .monospaced))
                     .foregroundColor(textPrimary)
             }
             .padding(.bottom, 8)
@@ -227,34 +199,36 @@ struct OnboardingView: View {
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundColor(textSecondary)
                 .tracking(1)
-            
-            Spacer()
+                .padding(.bottom, 32)
             
             // Keypad
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 3), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 3), spacing: 8) {
                 ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"], id: \.self) { key in
                     Text(key)
-                        .font(.system(size: 26, weight: .medium, design: .monospaced))
+                        .font(.system(size: 24, weight: .medium, design: .monospaced))
                         .foregroundColor(textPrimary)
-                        .frame(height: 56)
+                        .frame(height: 50)
                         .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 48)
+            .padding(.horizontal, 40)
+            .padding(.bottom, 32)
             
-            Spacer()
-            
-            // I Spent button as next
+            // Next button
             Button(action: {
                 HapticManager.shared.selection()
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    currentPage += 1
+                    if SubscriptionManager.shared.isPro {
+                        currentPage = 3 // skip paywall seamlessly
+                    } else {
+                        currentPage += 1
+                    }
                 }
             }) {
                 Text("I Spent")
-                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
                     .foregroundColor(textPrimary)
-                    .frame(width: 140, height: 58)
+                    .frame(width: 140, height: 50)
                     .background(buttonColor)
                     .clipShape(Capsule())
             }
@@ -263,6 +237,8 @@ struct OnboardingView: View {
             skipButton
                 .padding(.bottom, 24)
         }
+        .padding(.top, 48)
+        .padding(.bottom, 64)
     }
     
     
@@ -271,7 +247,15 @@ struct OnboardingView: View {
     private var paywallPage: some View {
         PaywallView(
             isEmbedded: true,
-            onComplete: { completeOnboarding() }
+            onComplete: {
+                if SubscriptionManager.shared.isFullAccess {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        currentPage = 3
+                    }
+                } else {
+                    completeOnboarding()
+                }
+            }
         )
     }
 
@@ -279,34 +263,30 @@ struct OnboardingView: View {
     
     private var restorePage: some View {
         VStack(spacing: 0) {
-            Spacer()
-            
             // Title
             Text("Welcome back.")
-                .font(.system(size: 40, weight: .medium, design: .monospaced))
+                .font(.system(size: 34, weight: .medium, design: .monospaced))
                 .foregroundColor(textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.bottom, 24)
             
             // Icon
             Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 60, weight: .light))
+                .font(.system(size: 50, weight: .light))
                 .foregroundColor(accentGreen)
-                .padding(.bottom, 32)
+                .padding(.bottom, 24)
             
             // Description
             Text("We found \(items.count) past transactions on your device. Would you like to keep them?")
-                .font(.system(size: 16, weight: .regular, design: .monospaced))
+                .font(.system(size: 15, weight: .regular, design: .monospaced))
                 .foregroundColor(textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(6)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 48)
-            
-            Spacer()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 40)
             
             // Choices
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Button(action: {
                     HapticManager.shared.success()
                     withAnimation {
@@ -342,9 +322,93 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(SquishyButtonStyle(isDoneButton: false))
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 56)
         }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 48)
+    }
+    
+    // MARK: - Page 5: Cloud Sync (Pro Only)
+
+    private var cloudSyncPage: some View {
+        VStack(spacing: 0) {
+            Text("iCloud Sync.")
+                .font(.system(size: 34, weight: .medium, design: .monospaced))
+                .foregroundColor(textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 24)
+
+            ZStack {
+                Image(systemName: "icloud.fill")
+                    .font(.system(size: 60, weight: .light))
+                    .foregroundColor(accentGreen.opacity(0.3))
+
+                if isRestoringCloudData {
+                    MochiSpinner(size: 28)
+                } else {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(accentGreen)
+                        .background(
+                            Circle().fill(creamBackground).frame(width: 36, height: 36)
+                        )
+                        .offset(x: 20, y: 20)
+                }
+            }
+            .padding(.bottom, 32)
+            .animation(.default, value: isRestoringCloudData)
+
+            Text("Enable iCloud to safely backup your data across devices, perfectly syncing your history. Returning members can restore their past records securely.")
+                .font(.system(size: 15, weight: .regular, design: .monospaced))
+                .foregroundColor(textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(6)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 40)
+
+            VStack(spacing: 12) {
+                Button(action: {
+                    HapticManager.shared.rigidImpact()
+                    isRestoringCloudData = true
+                    
+                    Task {
+                        settings.iCloudSyncEnabled = true
+                        CloudSyncManager.shared.forceRestore()
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
+                        await MainActor.run {
+                            isRestoringCloudData = false
+                            completeOnboarding()
+                        }
+                    }
+                }) {
+                    Text("Enable & Restore")
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        .foregroundColor(isDarkMode ? .black : .white)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(accentGreen)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                .disabled(isRestoringCloudData)
+
+                Button(action: {
+                    HapticManager.shared.softSquish()
+                    completeOnboarding()
+                }) {
+                    Text("Start Clean")
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        .foregroundColor(textPrimary)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(textPrimary.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(SquishyButtonStyle(isDoneButton: false))
+                .disabled(isRestoringCloudData)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 48)
     }
     
     private func deleteAllData() {

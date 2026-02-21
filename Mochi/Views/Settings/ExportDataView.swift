@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import LinkPresentation
 
 struct ExportDataView: View {
     @Environment(\.modelContext) private var modelContext
@@ -199,7 +200,10 @@ struct ExportDataView: View {
         }
         .sheet(isPresented: $showShareSheet, onDismiss: { exportURL = nil }) {
             if let url = exportURL {
-                ShareSheet(activityItems: [url])
+                let subject = exportType == .csv ? "Mochi Data Export" : "Mochi Transaction History"
+                let source = ShareActivityItemSource(url: url, subject: subject)
+                
+                ShareSheet(activityItems: [source])
                     .presentationDetents([.medium, .large])
             }
         }
@@ -321,12 +325,17 @@ struct ExportDataView: View {
                     let itemFont = UIFont.systemFont(ofSize: 10, weight: .regular)
                     
                     let headers = ["Date", "Note", "Amount", "Method"]
-                    let columnWidths: [CGFloat] = [75, 190, 120, 110]
+                    // Adjusted widths to give Amount more space, but we will add padding
+                    // Date: 75, Note: 170 (was 190), Amount: 140 (was 120), Method: 110
+                    let columnWidths: [CGFloat] = [75, 170, 140, 110]
                     var xOffset: CGFloat = margin
                     
                     for (index, header) in headers.enumerated() {
                         let alignment: NSTextAlignment = (index == 2) ? .right : .left
-                        let rect = CGRect(x: xOffset, y: yOffset, width: columnWidths[index], height: 20)
+                        // Add right padding to Amount column so it doesn't touch Method
+                        let widthAdjustment: CGFloat = (index == 2) ? -20 : 0
+                        
+                        let rect = CGRect(x: xOffset, y: yOffset, width: columnWidths[index] + widthAdjustment, height: 20)
                         let para = NSMutableParagraphStyle()
                         para.alignment = alignment
                         header.draw(in: rect, withAttributes: [
@@ -361,7 +370,10 @@ struct ExportDataView: View {
                         
                         for (index, value) in values.enumerated() {
                             let alignment: NSTextAlignment = (index == 2) ? .right : .left
-                            let rect = CGRect(x: xOffset, y: yOffset, width: columnWidths[index], height: 18)
+                            // Add right padding to Amount column here too
+                            let widthAdjustment: CGFloat = (index == 2) ? -20 : 0
+                            
+                            let rect = CGRect(x: xOffset, y: yOffset, width: columnWidths[index] + widthAdjustment, height: 18)
                             let para = NSMutableParagraphStyle()
                             para.alignment = alignment
                             value.draw(in: rect, withAttributes: [
@@ -384,15 +396,29 @@ struct ExportDataView: View {
                         yOffset += 10
                         
                         let totalAmount = itemsToExport.reduce(0) { $0 + $1.amount }
-                        let totalStr = "TOTAL: \(settings.currencySymbol)\(String(format: "%.2f", totalAmount))"
+                        let totalLabelStr = "TOTAL:"
+                        let totalValueStr = "\(settings.currencySymbol)\(String(format: "%.2f", totalAmount))"
                         
-                        let totalRect = CGRect(x: pageWidth - margin - 200, y: yOffset, width: 200, height: 25)
-                        let para = NSMutableParagraphStyle()
-                        para.alignment = .right
-                        totalStr.draw(in: totalRect, withAttributes: [
-                            NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12, weight: .bold),
+                        let totalFont = UIFont.systemFont(ofSize: 12, weight: .bold)
+                        
+                        let labelRect = CGRect(x: margin, y: yOffset, width: columnWidths[0] + columnWidths[1], height: 25)
+                        let leftPara = NSMutableParagraphStyle()
+                        leftPara.alignment = .left
+                        totalLabelStr.draw(in: labelRect, withAttributes: [
+                            NSAttributedString.Key.font: totalFont,
                             NSAttributedString.Key.foregroundColor: primaryUIColor,
-                            NSAttributedString.Key.paragraphStyle: para
+                            NSAttributedString.Key.paragraphStyle: leftPara
+                        ])
+                        
+                        let amountX = margin + columnWidths[0] + columnWidths[1]
+                        let amountWidth = columnWidths[2] - 20
+                        let amountRect = CGRect(x: amountX, y: yOffset, width: amountWidth, height: 25)
+                        let rightPara = NSMutableParagraphStyle()
+                        rightPara.alignment = .right
+                        totalValueStr.draw(in: amountRect, withAttributes: [
+                            NSAttributedString.Key.font: totalFont,
+                            NSAttributedString.Key.foregroundColor: primaryUIColor,
+                            NSAttributedString.Key.paragraphStyle: rightPara
                         ])
                     }
                 }
@@ -509,4 +535,36 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Share Helpers
+
+class ShareActivityItemSource: NSObject, UIActivityItemSource {
+    let url: URL
+    let subject: String
+    
+    init(url: URL, subject: String) {
+        self.url = url
+        self.subject = subject
+    }
+    
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        return url
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
+        return url
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
+        return subject
+    }
+    
+    func activityViewControllerLinkMetadata(_ activityViewController: UIActivityViewController) -> LPLinkMetadata? {
+        let metadata = LPLinkMetadata()
+        metadata.title = subject
+        metadata.originalURL = url
+        metadata.url = url
+        return metadata
+    }
 }

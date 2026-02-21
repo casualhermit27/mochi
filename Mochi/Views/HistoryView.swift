@@ -16,7 +16,6 @@ struct HistoryView: View {
     @State private var taggingItem: Item? = nil
     @State private var tagText: String = ""
     @FocusState private var isTagFocused: Bool
-    @State private var showSettings = false
     @State private var showRestoreToast = false
     
     // Undo State
@@ -703,12 +702,6 @@ struct HistoryView: View {
                         }
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(dynamicText)
-                    } else {
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gearshape")
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(dynamicText)
-                        }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -734,12 +727,6 @@ struct HistoryView: View {
                 }
             }
             .toolbarColorScheme(isNightTime ? .dark : .light, for: .navigationBar)
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-                    .presentationBackground(.regularMaterial)
-                    .presentationCornerRadius(32)
-            }
-
             .sheet(isPresented: $showSearchDatePicker) {
                 VStack(spacing: 16) {
                     // Drag Indicator
@@ -810,7 +797,6 @@ struct HistoryView: View {
             }
             .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
                 if shouldDismiss {
-                    showSettings = false
                     showSearchDatePicker = false
                     dismiss()
                 }

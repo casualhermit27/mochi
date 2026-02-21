@@ -32,7 +32,9 @@ struct MochiApp: App {
             try? FileManager.default.moveItem(at: walOld, to: walNew)
         }
 
-        let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
+        // Use user's preference to determine if we sync to CloudKit
+        let shouldSync = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+        let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: shouldSync ? .automatic : .none)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -45,51 +47,55 @@ struct MochiApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainContentView()
-                .onAppear {
-                    NotificationManager.shared.setModelContainer(sharedModelContainer)
-                }
-                .sheet(isPresented: $subscriptionManager.showCustomerCenter) {
-                    SubscriptionCustomerCenterView()
-                }
-                .sheet(isPresented: $subscriptionManager.showPaywall) {
-                    PaywallView()
-                        .presentationCornerRadius(32)
-                }
-                .sheet(isPresented: .init(
-                    get: { !settings.hasCompletedOnboarding },
-                    set: { if !$0 { settings.hasCompletedOnboarding = true } }
-                )) {
-                    OnboardingView()
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.hidden)
-                        .presentationCornerRadius(32)
-                        .interactiveDismissDisabled()
-                }
-                .fullScreenCover(item: $notificationManager.activeReflection) { data in
-                    ReflectionView(
-                        data: data,
-                        onDismiss: {
-                            notificationManager.activeReflection = nil
-                        },
-                        onViewHistory: {
-                            notificationManager.activeReflection = nil
-                            // Trigger history on main screen
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                notificationManager.shouldOpenHistory = true
+                ZStack {
+                    MainContentView()
+                        .onAppear {
+                            NotificationManager.shared.setModelContainer(sharedModelContainer)
+                        }
+                        .sheet(isPresented: $subscriptionManager.showCustomerCenter) {
+                            SubscriptionCustomerCenterView()
+                        }
+                        .sheet(isPresented: $subscriptionManager.showPaywall) {
+                            PaywallView()
+                                .presentationCornerRadius(32)
+                        }
+                        .fullScreenCover(item: $notificationManager.activeReflection) { data in
+                            ReflectionView(
+                                data: data,
+                                onDismiss: {
+                                    notificationManager.activeReflection = nil
+                                },
+                                onViewHistory: {
+                                    notificationManager.activeReflection = nil
+                                    // Trigger history on main screen
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        notificationManager.shouldOpenHistory = true
+                                    }
+                                }
+                            )
+                        }
+                        .onOpenURL { url in
+                            print("Mochi opened with URL: \(url)")
+                        }
+                        .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
+                            if shouldDismiss {
+                                subscriptionManager.showCustomerCenter = false
+                                subscriptionManager.showPaywall = false
                             }
                         }
-                    )
-                }
-                .onOpenURL { url in
-                    print("Mochi opened with URL: \(url)")
-                }
-                .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
-                    if shouldDismiss {
-                        subscriptionManager.showCustomerCenter = false
-                        subscriptionManager.showPaywall = false
+                    
+                    if !settings.hasCompletedOnboarding {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .zIndex(99)
+                            .transition(.opacity)
+                        
+                        OnboardingView()
+                            .zIndex(100)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
+
         }
         .modelContainer(sharedModelContainer)
     }

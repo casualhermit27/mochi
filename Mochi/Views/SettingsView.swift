@@ -135,6 +135,22 @@ struct SettingsView: View {
                                 .padding(.horizontal, 20)
                             }
                             
+                            // 2.2 Cloud Sync
+                            if subscription.isFullAccess {
+                                NavigationLink(destination: CloudSyncSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    MenuRow(icon: "icloud.fill", title: "Cloud Sync", value: settings.iCloudSyncEnabled ? "On" : "Off", dynamicText: dynamicText)
+                                }
+                                .accessibilityIdentifier("cloud_sync_row")
+                                .padding(.horizontal, 20)
+                            } else {
+                                Button(action: {
+                                    HapticManager.shared.rigidImpact()
+                                    subscription.showPaywall = true
+                                }) {
+                                    MenuRow(icon: "icloud.fill", title: "Cloud Sync", value: settings.iCloudSyncEnabled ? "On" : "Off", dynamicText: dynamicText)
+                                }
+                                .padding(.horizontal, 20)
+                            }
                             
                             // 3. Notifications
                             NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
@@ -908,6 +924,7 @@ struct AboutSettingsView: View {
     let isNightTime: Bool
     
     @Environment(\.dismiss) var dismiss
+    @State private var isRestoring = false
 
     var body: some View {
         ZStack {
@@ -980,11 +997,22 @@ struct AboutSettingsView: View {
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
                                         .foregroundColor(dynamicText)
                                     Spacer()
-                                    Button("Restore") {
-                                        Task { await subscription.restorePurchases() }
+                                    Button(action: {
+                                        isRestoring = true
+                                        Task { 
+                                            await subscription.restorePurchases()
+                                            isRestoring = false
+                                        }
+                                    }) {
+                                        if isRestoring {
+                                            MochiSpinner(size: 22)
+                                        } else {
+                                            Text("Restore")
+                                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                                .foregroundColor(dynamicText.opacity(0.5))
+                                        }
                                     }
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundColor(dynamicText.opacity(0.5))
+                                    .disabled(isRestoring)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
@@ -1160,5 +1188,140 @@ struct ColorThemeButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct CloudSyncSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    @Environment(\.dismiss) var dismiss
+    
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+    
+    var accentColor: Color {
+        if settings.colorTheme != "default" {
+            return settings.currentPastelTheme.accent
+        }
+        return Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+    
+    @State private var showRestartAlert = false
+    @State private var showRestoreSuccessAlert = false
+    @State private var isRestoring = false
+    
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold)) // Slightly bolder
+                            .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40) // Increased touch target
+                            .background(dynamicText.opacity(0.04)) // Subtle background
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
+                            )
+                    }
+                    Spacer()
+                    Text("Cloud Sync")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16) // Safe area buffer handled by parent view padding or system
+                .padding(.bottom, 12)
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        SettingsSection(icon: "icloud.fill", title: "ICLOUD BACKUP", textColor: dynamicText) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Sync your transactions securely to your personal iCloud account. This seamlessly brings back your history on reinstall.")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(dynamicText.opacity(0.6))
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 8)
+                                
+                                Toggle(isOn: Binding(
+                                    get: { settings.iCloudSyncEnabled },
+                                    set: { newValue in
+                                        settings.iCloudSyncEnabled = newValue
+                                        showRestartAlert = true
+                                        HapticManager.shared.selection()
+                                    }
+                                )) {
+                                    Text("Enable iCloud Sync")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                }
+                                .tint(accentColor)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                        }
+                        
+                        SettingsSection(icon: "arrow.triangle.2.circlepath", title: "DATA RECOVERY", textColor: dynamicText) {
+                            Button(action: {
+                                HapticManager.shared.rigidImpact()
+                                isRestoring = true
+                                Task {
+                                    CloudSyncManager.shared.forceRestore()
+                                    try? await Task.sleep(nanoseconds: 800_000_000)
+                                    await MainActor.run {
+                                        isRestoring = false
+                                        showRestoreSuccessAlert = true
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    Text("Force Restore from iCloud")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(dynamicText)
+                                    Spacer()
+                                    if isRestoring {
+                                        MochiSpinner(size: 22)
+                                    } else {
+                                        Image(systemName: "arrow.down.doc.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(dynamicText.opacity(0.5))
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .disabled(isRestoring)
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .alert("Restart Required", isPresented: $showRestartAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please fully restart Mochi (swipe up to force close in App Switcher, then reopen) for iCloud Sync changes to take effect.")
+        }
+        .alert("Restored", isPresented: $showRestoreSuccessAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your settings and saved cards have been forcefuly restored from iCloud.")
+        }
     }
 }
