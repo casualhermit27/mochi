@@ -94,7 +94,35 @@ struct MochiApp: App {
                             .zIndex(100)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    
+                    // Global Sync Toast
+                    if settings.showSyncToast {
+                        VStack {
+                            HStack(spacing: 8) {
+                                Image(systemName: "icloud.fill")
+                                    .font(.system(size: 14))
+                                Text("iCloud Synced")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.mochiGreen)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                            .shadow(color: Color.black.opacity(0.1), radius: 10, y: 5)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .padding(.top, 40)
+                            
+                            Spacer()
+                        }
+                        .zIndex(200)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation { settings.hideSyncToast() }
+                        }
+                    }
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: settings.showSyncToast)
 
         }
         .modelContainer(sharedModelContainer)

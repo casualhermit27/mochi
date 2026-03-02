@@ -10,6 +10,9 @@
 		C316FAE32F1BEFE000B7E257 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = C316FAE22F1BEFE000B7E257 /* ReceiptParser */; };
 		C316FAE52F1BEFE000B7E257 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = C316FAE42F1BEFE000B7E257 /* RevenueCat */; };
 		C316FAE72F1BEFE000B7E257 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = C316FAE62F1BEFE000B7E257 /* RevenueCatUI */; };
+		E54BAB4A2F4AF0BA00802A05 /* mochi.icon in Resources */ = {isa = PBXBuildFile; fileRef = E54BAB492F4AF0BA00802A05 /* mochi.icon */; };
+		E54BAB4B2F4AF0BA00802A05 /* mochi.icon in Resources */ = {isa = PBXBuildFile; fileRef = E54BAB492F4AF0BA00802A05 /* mochi.icon */; };
+		E54BAB4C2F4AF0BA00802A05 /* mochi.icon in Resources */ = {isa = PBXBuildFile; fileRef = E54BAB492F4AF0BA00802A05 /* mochi.icon */; };
 		E590D20E2F1BF9A200ACC0CD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C316FAC52F1BED5E00B7E257 /* WidgetKit.framework */; };
 		E590D20F2F1BF9A200ACC0CD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C316FAC72F1BED5F00B7E257 /* SwiftUI.framework */; };
 		E590D2202F1BF9A400ACC0CD /* MochiWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E590D20D2F1BF9A200ACC0CD /* MochiWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -53,6 +56,7 @@
 		C316FAC52F1BED5E00B7E257 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		C316FAC72F1BED5F00B7E257 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		E54BA9142F4366AC00802A05 /* MochiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MochiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E54BAB492F4AF0BA00802A05 /* mochi.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = mochi.icon; sourceTree = "<group>"; };
 		E590D20D2F1BF9A200ACC0CD /* MochiWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MochiWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5B32E022F3752BE00F71F33 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E5B32F7D2F3C623F00F71F33 /* Mochi.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Mochi.storekit; sourceTree = "<group>"; };
@@ -139,6 +143,7 @@
 				C316FAC42F1BED5E00B7E257 /* Frameworks */,
 				C316FA842F1BEC7400B7E257 /* Products */,
 				E5B32E022F3752BE00F71F33 /* PrivacyInfo.xcprivacy */,
+				E54BAB492F4AF0BA00802A05 /* mochi.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -288,6 +293,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E5B32F7E2F3C623F00F71F33 /* Mochi.storekit in Resources */,
+				E54BAB4C2F4AF0BA00802A05 /* mochi.icon in Resources */,
 				E5B32E202F3752BE00F71F33 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -296,6 +302,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E54BAB4A2F4AF0BA00802A05 /* mochi.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +310,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E54BAB4B2F4AF0BA00802A05 /* mochi.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -468,8 +476,9 @@
 		C316FA912F1BEC7600B7E257 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mochi;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -509,8 +518,9 @@
 		C316FA922F1BEC7600B7E257 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mochi;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;

@@ -21,6 +21,7 @@ struct OnboardingView: View {
     @State private var breathingScale: CGFloat = 1.0
     @State private var buttonAppeared = false
     @State private var isRestoringCloudData = false
+    @State private var showNoDataAlert = false
     
     private var totalPages: Int {
         shouldShowRestorePage ? 5 : 4
@@ -89,9 +90,22 @@ struct OnboardingView: View {
             .background(creamBackground)
             .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
             .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.bottom, 12)
             .shadow(color: Color.black.opacity(0.12), radius: 32, x: 0, y: 16)
         }
+        .contentShape(Rectangle()) // allow gesture on entire space
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    // slide left to go back
+                    if value.translation.width > 50 && currentPage > 0 {
+                        HapticManager.shared.selection()
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            currentPage -= 1
+                        }
+                    }
+                }
+        )
         .onAppear {
             if shouldShowRestorePage {
                 currentPage = -1
@@ -121,47 +135,38 @@ struct OnboardingView: View {
     // MARK: - Page 1: Emotional Hook
     
     private var welcomePage: some View {
-        VStack(spacing: 0) {
-            // Title with subtle animation
-            Text("Calm spending\nawareness.")
-                .font(.system(size: 34, weight: .medium, design: .monospaced))
-                .foregroundColor(textPrimary)
-                .multilineTextAlignment(.center)
-                .scaleEffect(breathingScale)
-                .padding(.bottom, 32)
+        VStack(alignment: .leading, spacing: 32) {
             
-            // Logo
-            Image("MochiLogo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 100, height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .scaleEffect(logoScale)
-                .opacity(logoOpacity)
-                .padding(.bottom, 32)
+            AnimatedHeroView(
+                chunks: [
+                    .text("Hi, I'm ", isHighlight: false),
+                    .text("Mochi\u{00A0}", isHighlight: true),
+                    .mascot("MochiCharacter"),
+                    .newline,
+                    .text("I'll help you track your spending effortlessly. ", isHighlight: false),
+                    .text("A simple space for ", isHighlight: false),
+                    .text("you.", isHighlight: true)
+                ],
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                startDelay: 0.1
+            )
+            .padding(.bottom, 16)
             
-            // Description
-            Text("Mochi helps you log expenses quickly\nwithout turning budgeting into work.")
-                .font(.system(size: 15, weight: .regular, design: .monospaced))
-                .foregroundColor(textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(6)
-                .opacity(contentOpacity)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 40)
-            
-            // Button
-            nextButton(text: "Continue")
-                .accessibilityIdentifier("onboarding_continue_button")
-                .opacity(buttonAppeared ? 1 : 0)
-                .offset(y: buttonAppeared ? 0 : 20)
-            
-            skipButton
-                .accessibilityIdentifier("onboarding_skip_button")
-                .opacity(buttonAppeared ? 1 : 0)
+            // Button Group
+            VStack(spacing: 8) {
+                nextButton(text: "Continue")
+                    .accessibilityIdentifier("onboarding_continue_button")
+                
+                skipButton
+                    .accessibilityIdentifier("onboarding_skip_button")
+            }
+            .padding(.top, 12)
+            .opacity(buttonAppeared ? 1 : 0)
+            .offset(y: buttonAppeared ? 0 : 20)
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 48)
+        .padding(.vertical, 32)
     }
     
 
@@ -169,76 +174,54 @@ struct OnboardingView: View {
     // MARK: - Page 3: Track Spending
     
     private var trackSpendingPage: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Good morning.")
-                    .font(.system(size: 15, weight: .medium, design: .monospaced))
-                    .foregroundColor(textSecondary)
-                Spacer()
-                Image(systemName: "clock")
-                    .font(.system(size: 20, weight: .light))
-                    .foregroundColor(textSecondary)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 32)
+        VStack(alignment: .leading, spacing: 32) {
+            AnimatedHeroView(
+                chunks: [
+                    .text("Built for ", isHighlight: false),
+                    .text("speed ⚡\u{00A0}", isHighlight: true),
+                    .newline,
+                    .text("No fluff, just flow. Open\u{00A0}", isHighlight: false),
+                    .image("MochiLogo"),
+                    .text(",\u{00A0}Log\u{00A0}", isHighlight: false),
+                    .button("I Spent", buttonColor),
+                    .text(",\u{00A0}and Close\u{00A0}", isHighlight: true),
+                    .iconButton("xmark", textPrimary.opacity(0.1)),
+                    .text(". We'll handle the numbers.", isHighlight: false)
+                ],
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                startDelay: 0.1
+            )
+            .padding(.bottom, 16)
             
-            // Amount Display
-            HStack(spacing: 2) {
-                Text(settings.currencySymbol)
-                    .font(.system(size: 32, weight: .medium, design: .monospaced))
-                    .foregroundColor(textPrimary.opacity(0.35))
-                
-                Text("42")
-                    .font(.system(size: 64, weight: .medium, design: .monospaced))
-                    .foregroundColor(textPrimary)
-            }
-            .padding(.bottom, 8)
-            
-            Text("Tap. Log. Done.")
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundColor(textSecondary)
-                .tracking(1)
-                .padding(.bottom, 32)
-            
-            // Keypad
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 3), spacing: 8) {
-                ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"], id: \.self) { key in
-                    Text(key)
-                        .font(.system(size: 24, weight: .medium, design: .monospaced))
-                        .foregroundColor(textPrimary)
-                        .frame(height: 50)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 32)
-            
-            // Next button
-            Button(action: {
-                HapticManager.shared.selection()
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    if SubscriptionManager.shared.isPro {
-                        currentPage = 3 // skip paywall seamlessly
-                    } else {
-                        currentPage += 1
+            // Button Group
+            VStack(spacing: 8) {
+                Button(action: {
+                    HapticManager.shared.selection()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        if SubscriptionManager.shared.isPro {
+                            currentPage = 3 // skip paywall seamlessly
+                        } else {
+                            currentPage += 1
+                        }
                     }
+                }) {
+                    Text("I Spent")
+                        .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                        .foregroundColor(textPrimary)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(buttonColor)
+                        .clipShape(Capsule())
                 }
-            }) {
-                Text("I Spent")
-                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
-                    .foregroundColor(textPrimary)
-                    .frame(width: 140, height: 50)
-                    .background(buttonColor)
-                    .clipShape(Capsule())
+                .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                
+                skipButton
             }
-            .buttonStyle(SquishyButtonStyle(isDoneButton: true))
-            
-            skipButton
-                .padding(.bottom, 24)
+            .padding(.top, 12)
         }
-        .padding(.top, 48)
-        .padding(.bottom, 64)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
     }
     
     
@@ -330,85 +313,101 @@ struct OnboardingView: View {
     // MARK: - Page 5: Cloud Sync (Pro Only)
 
     private var cloudSyncPage: some View {
-        VStack(spacing: 0) {
-            Text("iCloud Sync.")
-                .font(.system(size: 34, weight: .medium, design: .monospaced))
-                .foregroundColor(textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.bottom, 24)
-
-            ZStack {
-                Image(systemName: "icloud.fill")
-                    .font(.system(size: 60, weight: .light))
-                    .foregroundColor(accentGreen.opacity(0.3))
-
-                if isRestoringCloudData {
-                    MochiSpinner(size: 28)
-                } else {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(accentGreen)
-                        .background(
-                            Circle().fill(creamBackground).frame(width: 36, height: 36)
-                        )
-                        .offset(x: 20, y: 20)
-                }
-            }
-            .padding(.bottom, 32)
-            .animation(.default, value: isRestoringCloudData)
-
-            Text("Enable iCloud to safely backup your data across devices, perfectly syncing your history. Returning members can restore their past records securely.")
-                .font(.system(size: 15, weight: .regular, design: .monospaced))
-                .foregroundColor(textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(6)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 40)
-
+        VStack(alignment: .leading, spacing: 32) {
+            
+            AnimatedHeroView(
+                chunks: [
+                    .text("Keep your history ", isHighlight: false),
+                    .text("safe 🔒 ", isHighlight: true),
+                    .text("Enable\u{00A0}", isHighlight: false),
+                    .icon("icloud.fill", textPrimary),
+                    .text("\u{00A0}iCloud ", isHighlight: true),
+                    .text("to perfectly sync or ", isHighlight: false),
+                    .text("restore\u{00A0}", isHighlight: true),
+                    .icon("arrow.triangle.2.circlepath", textPrimary),
+                    .text("\u{00A0}it securely.", isHighlight: false)
+                ],
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                startDelay: 0.1
+            )
+            .padding(.bottom, 16)
+            
             VStack(spacing: 12) {
-                Button(action: {
-                    HapticManager.shared.rigidImpact()
-                    isRestoringCloudData = true
-                    
-                    Task {
+                if !settings.iCloudSyncEnabled {
+                    Button(action: {
+                        HapticManager.shared.success()
                         settings.iCloudSyncEnabled = true
-                        CloudSyncManager.shared.forceRestore()
-                        try? await Task.sleep(nanoseconds: 1_200_000_000)
-                        await MainActor.run {
-                            isRestoringCloudData = false
-                            completeOnboarding()
-                        }
+                        CloudSyncManager.shared.startSyncing()
+                    }) {
+                        Text("Enable iCloud Sync")
+                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            .foregroundColor(isDarkMode ? .black : .white)
+                            .frame(height: 56)
+                            .frame(maxWidth: .infinity)
+                            .background(accentGreen)
+                            .clipShape(Capsule())
                     }
-                }) {
-                    Text("Enable & Restore")
+                    .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                } else {
+                    Button(action: {
+                        HapticManager.shared.rigidImpact()
+                        isRestoringCloudData = true
+                        
+                        Task {
+                            let hasData = CloudSyncManager.shared.forceRestore()
+                            try? await Task.sleep(nanoseconds: 1_200_000_000)
+                            await MainActor.run {
+                                isRestoringCloudData = false
+                                if hasData {
+                                    completeOnboarding()
+                                } else {
+                                    showNoDataAlert = true
+                                }
+                            }
+                        }
+                    }) {
+                        HStack {
+                            if isRestoringCloudData {
+                                MochiSpinner(size: 20)
+                                    .padding(.trailing, 4)
+                            }
+                            Text("Restore from iCloud")
+                        }
                         .font(.system(size: 16, weight: .semibold, design: .monospaced))
                         .foregroundColor(isDarkMode ? .black : .white)
                         .frame(height: 56)
                         .frame(maxWidth: .infinity)
                         .background(accentGreen)
                         .clipShape(Capsule())
-                }
-                .buttonStyle(SquishyButtonStyle(isDoneButton: true))
-                .disabled(isRestoringCloudData)
+                    }
+                    .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+                    .disabled(isRestoringCloudData)
 
-                Button(action: {
-                    HapticManager.shared.softSquish()
-                    completeOnboarding()
-                }) {
-                    Text("Start Clean")
-                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                        .foregroundColor(textPrimary)
-                        .frame(height: 56)
-                        .frame(maxWidth: .infinity)
-                        .background(textPrimary.opacity(0.08))
-                        .clipShape(Capsule())
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        completeOnboarding()
+                    }) {
+                        Text("Start Clean")
+                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            .foregroundColor(textPrimary)
+                            .frame(height: 56)
+                            .frame(maxWidth: .infinity)
+                            .background(textPrimary.opacity(0.08))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(SquishyButtonStyle(isDoneButton: false))
+                    .disabled(isRestoringCloudData)
                 }
-                .buttonStyle(SquishyButtonStyle(isDoneButton: false))
-                .disabled(isRestoringCloudData)
             }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 48)
+        .alert("No Data Found", isPresented: $showNoDataAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("We couldn't find any Mochi data in your iCloud account.")
+        }
     }
     
     private func deleteAllData() {

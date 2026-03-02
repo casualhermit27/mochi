@@ -1208,6 +1208,7 @@ struct CloudSyncSettingsView: View {
     
     @State private var showRestartAlert = false
     @State private var showRestoreSuccessAlert = false
+    @State private var showNoDataAlert = false
     @State private var isRestoring = false
     
     var body: some View {
@@ -1278,11 +1279,15 @@ struct CloudSyncSettingsView: View {
                                 HapticManager.shared.rigidImpact()
                                 isRestoring = true
                                 Task {
-                                    CloudSyncManager.shared.forceRestore()
+                                    let hasData = CloudSyncManager.shared.forceRestore()
                                     try? await Task.sleep(nanoseconds: 800_000_000)
                                     await MainActor.run {
                                         isRestoring = false
-                                        showRestoreSuccessAlert = true
+                                        if hasData {
+                                            showRestoreSuccessAlert = true
+                                        } else {
+                                            showNoDataAlert = true
+                                        }
                                     }
                                 }
                             }) {
@@ -1321,7 +1326,12 @@ struct CloudSyncSettingsView: View {
         .alert("Restored", isPresented: $showRestoreSuccessAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Your settings and saved cards have been forcefuly restored from iCloud.")
+            Text("Your settings and saved cards have been forcefully restored from iCloud.")
+        }
+        .alert("No Data Found", isPresented: $showNoDataAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("We couldn't find any Mochi data in your iCloud account.")
         }
     }
 }

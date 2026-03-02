@@ -60,6 +60,8 @@ class SettingsManager: ObservableObject {
     
     // Cloud Sync
     @AppStorage("iCloudSyncEnabled") var iCloudSyncEnabled: Bool = false
+    @Published var lastSyncStatus: String? = nil // "synced", "no_data", or nil
+    @Published var showSyncToast: Bool = false
     
     // MARK: - Speed Dial
     @AppStorage("speedDialPresetsData") var speedDialPresetsData: Data = Data()
@@ -108,6 +110,15 @@ class SettingsManager: ObservableObject {
         if iCloudSyncEnabled {
             CloudSyncManager.shared.startSyncing()
         }
+    }
+    
+    func iCloudDataDidChange(status: String) {
+        lastSyncStatus = status
+        showSyncToast = true
+    }
+    
+    func hideSyncToast() {
+        showSyncToast = false
     }
     
     var paymentMethods: [PaymentMethod] {
@@ -417,14 +428,17 @@ class CloudSyncManager: NSObject {
         isProcessingRemoteChanges = false
     }
     
-    func forceRestore() {
+    @discardableResult
+    func forceRestore() -> Bool {
         // Trigger implicit sync to grab latest data from Apple
         store.synchronize()
         
         isProcessingRemoteChanges = true
         var needsRefresh = false
+        var hasDataInCloud = false
         for key in syncedKeys {
             if let remoteValue = store.object(forKey: key) {
+                hasDataInCloud = true
                 let localValue = defaults.object(forKey: key)
                 if !areEqual(localValue, remoteValue) {
                     defaults.set(remoteValue, forKey: key)
@@ -440,9 +454,21 @@ class CloudSyncManager: NSObject {
             }
         }
         isProcessingRemoteChanges = false
+        return hasDataInCloud
     }
     
     @objc private func iCloudDataDidChange(_ notification: Notification) {
+        // Notify SettingsManager
+        DispatchQueue.main.async {
+            SettingsManager.shared.lastSyncStatus = "synced"
+            SettingsManager.shared.showSyncToast = true
+            
+            // Auto hide after 3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                SettingsManager.shared.hideSyncToast()
+            }
+        }
+        
         guard let userInfo = notification.userInfo,
               let changedKeys = userInfo[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] else { return }
         
