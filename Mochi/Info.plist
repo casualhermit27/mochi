@@ -6,5 +6,9 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Mochi uses your camera to scan receipts so you can log purchases quickly.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Mochi reads photos from your library so you can scan saved receipt images.</string>
 </dict>
 </plist>

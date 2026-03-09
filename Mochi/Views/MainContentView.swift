@@ -45,6 +45,18 @@ struct MainContentView: View {
     // Payment Method Selector
     @State private var showPaymentSelector = false
     @State private var showPaymentMethods = false
+
+    // Receipt Scanner
+    @State private var showReceiptSourcePicker = false
+    @State private var showCamera = false
+    @State private var showPhotoLibrary = false
+    @State private var isScanning = false
+    @State private var receiptScanResult: ReceiptScanResult? = nil
+    @State private var showReceiptReview = false
+    @State private var showScanError = false
+    @State private var scanErrorMessage = ""
+    @State private var isLaunchingReceiptFlow = false
+    @State private var scanButtonPop = false
     
 
     
@@ -328,17 +340,64 @@ struct MainContentView: View {
                 KeypadView(onTap: handleKeypadInput, onLongPress: handleKeypadLongPress, textColor: dynamicText)
                     .padding(.bottom, 20)
                 
-                // Done Button
-                Button(action: saveEntry) {
-                    Text("I Spent")
-                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                        .foregroundColor(doneButtonTextColor)
-                        .frame(width: 140, height: 60)
-                        .background(doneButtonColor)
-                        .clipShape(Capsule())
+                // Done Button + Receipt Scan Button
+                ZStack {
+                    // "I Spent" stays perfectly centered
+                    Button(action: saveEntry) {
+                        Text("I Spent")
+                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                            .foregroundColor(doneButtonTextColor)
+                            .frame(width: 140, height: 60)
+                            .background(doneButtonColor)
+                            .clipShape(Capsule())
+                    }
+                    .accessibilityIdentifier("spent_button")
+                    .disabled(!isInputActive)
+
+                    // Receipt scan button floated to the right
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            guard !isScanning, !isLaunchingReceiptFlow, !showReceiptSourcePicker else { return }
+                            isLaunchingReceiptFlow = true
+                            HapticManager.shared.softSquish()
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.58)) {
+                                scanButtonPop = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                withAnimation(.spring(response: 0.24, dampingFraction: 0.72)) {
+                                    scanButtonPop = false
+                                }
+                            }
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                                showReceiptSourcePicker = true
+                            }
+                        }) {
+                            ZStack {
+                                if isScanning {
+                                    MochiSpinner(size: 20)
+                                } else {
+                                    Image(systemName: "doc.viewfinder")
+                                        .font(.system(size: 20, weight: .light))
+                                        .foregroundColor(accentColor)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(accentColor.opacity(0.52), lineWidth: 1.2)
+                            )
+                            .clipShape(Circle())
+                            .scaleEffect(scanButtonPop ? 1.12 : 1.0)
+                            .shadow(color: accentColor.opacity(scanButtonPop ? 0.35 : 0.12), radius: scanButtonPop ? 14 : 6, y: 2)
+                        }
+                        .buttonStyle(SquishyButtonStyle())
+                        .disabled(isScanning || isLaunchingReceiptFlow || showCamera || showPhotoLibrary)
+                        .accessibilityLabel("Scan receipt")
+                        .padding(.trailing, UIScreen.main.bounds.width / 2 - 134)
+                    }
                 }
-                .accessibilityIdentifier("spent_button")
-                .disabled(!isInputActive)
+                .frame(maxWidth: .infinity)
                 .padding(.bottom, 40)
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -405,6 +464,68 @@ struct MainContentView: View {
             .presentationBackground(dynamicBackground)
             .preferredColorScheme(isNightTime ? .dark : .light)
         }
+        .sheet(isPresented: $showReceiptSourcePicker) {
+            ReceiptSourcePickerSheet(
+                dynamicText: dynamicText,
+                dynamicBackground: dynamicBackground,
+                accentColor: accentColor,
+                isNightTime: isNightTime,
+                isCameraAvailable: UIImagePickerController.isSourceTypeAvailable(.camera),
+                onTakePhoto: {
+                    showReceiptSourcePicker = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        showCamera = true
+                        isLaunchingReceiptFlow = false
+                    }
+                },
+                onChooseLibrary: {
+                    showReceiptSourcePicker = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        showPhotoLibrary = true
+                        isLaunchingReceiptFlow = false
+                    }
+                }
+            )
+            .presentationDetents([.height(230)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+            .presentationBackground(dynamicBackground)
+            .preferredColorScheme(isNightTime ? .dark : .light)
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPickerView { image in
+                showCamera = false
+                processScannedImage(image)
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showPhotoLibrary) {
+            PhotoLibraryPickerView { image in
+                showPhotoLibrary = false
+                processScannedImage(image)
+            }
+        }
+        .sheet(isPresented: $showReceiptReview) {
+            if let result = receiptScanResult {
+                ReceiptReviewView(
+                    dynamicText: dynamicText,
+                    dynamicBackground: dynamicBackground,
+                    accentColor: accentColor,
+                    isNightTime: isNightTime,
+                    result: result,
+                    onSave: saveReceiptEntry
+                )
+                .presentationDetents([.large])
+                .presentationCornerRadius(32)
+                .presentationBackground(dynamicBackground)
+                .preferredColorScheme(isNightTime ? .dark : .light)
+            }
+        }
+        .alert("Couldn't Read Receipt", isPresented: $showScanError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(scanErrorMessage)
+        }
         .onChange(of: notificationManager.shouldDismissAllSheets) { _, shouldDismiss in
             if shouldDismiss {
                 showSettings = false
@@ -413,6 +534,10 @@ struct MainContentView: View {
                 subscription.showPaywall = false
                 isInputActive = false
                 currentInput = "0"
+                showCamera = false
+                showPhotoLibrary = false
+                showReceiptReview = false
+                isScanning = false
             }
         }
         .onChange(of: showHistory) { _, isPresented in
@@ -428,6 +553,11 @@ struct MainContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     withAnimation { showAddedAnimation = false }
                 }
+            }
+        }
+        .onChange(of: showReceiptSourcePicker) { _, isPresented in
+            if !isPresented && !showCamera && !showPhotoLibrary {
+                isLaunchingReceiptFlow = false
             }
         }
         .onAppear {
@@ -660,6 +790,58 @@ struct MainContentView: View {
         }
     }
     
+    // MARK: - Receipt Scanning
+
+    private func processScannedImage(_ image: UIImage) {
+        isScanning = true
+        Task {
+            do {
+                let result = try await ReceiptScannerManager.shared.scan(image: image)
+                await MainActor.run {
+                    isScanning = false
+                    guard let amount = result.totalAmount, amount > 0 else {
+                        scanErrorMessage = "No total amount was found on the receipt."
+                        showScanError = true
+                        return
+                    }
+                    receiptScanResult = result
+                    showReceiptReview = true
+                    HapticManager.shared.success()
+                }
+            } catch {
+                await MainActor.run {
+                    isScanning = false
+                    scanErrorMessage = error.localizedDescription
+                    showScanError = true
+                }
+            }
+        }
+    }
+
+    private func saveReceiptEntry(amount: Double, note: String?, date: Date) {
+        guard amount > 0 else { return }
+
+        let methodId = settings.selectedPaymentMethod.id.uuidString
+        let newItem = Item(timestamp: date, amount: amount, note: note, paymentMethodId: methodId)
+        modelContext.insert(newItem)
+
+        lastAddedItem = newItem
+        lastAddedTime = Date()
+
+        addedAmount = amount
+        isNegativeDelta = false
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            showAddedAnimation = true
+        }
+
+        toastMessage = "Receipt added."
+        withAnimation { showToast = true }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation { showAddedAnimation = false; showToast = false }
+        }
+    }
+
     private func undoLastAdd() {
         guard let item = lastAddedItem, let time = lastAddedTime else { return }
         
@@ -699,6 +881,101 @@ struct MainContentView: View {
                 withAnimation { showToast = false; showAddedAnimation = false } 
             }
         }
+    }
+}
+
+struct ReceiptSourcePickerSheet: View {
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let accentColor: Color
+    let isNightTime: Bool
+    let isCameraAvailable: Bool
+    let onTakePhoto: () -> Void
+    let onChooseLibrary: () -> Void
+
+    @State private var animateIn = false
+    @State private var isPicking = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add Receipt")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(dynamicText)
+
+            if isCameraAvailable {
+                sourceButton(
+                    title: "Take Photo",
+                    subtitle: "Use camera to scan now",
+                    icon: "camera.fill",
+                    action: onTakePhoto
+                )
+            }
+
+            sourceButton(
+                title: "Choose from Photos",
+                subtitle: "Pick a receipt image",
+                icon: "photo.on.rectangle.angled",
+                action: onChooseLibrary
+            )
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
+        .background(dynamicBackground)
+        .opacity(animateIn ? 1 : 0.45)
+        .scaleEffect(animateIn ? 1 : 0.92)
+        .offset(y: animateIn ? 0 : 22)
+        .onAppear {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.74)) {
+                animateIn = true
+            }
+        }
+    }
+
+    private func sourceButton(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            guard !isPicking else { return }
+            isPicking = true
+            HapticManager.shared.selection()
+            withAnimation(.easeOut(duration: 0.12)) {
+                animateIn = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                action()
+                isPicking = false
+            }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(accentColor)
+                    .frame(width: 34, height: 34)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundColor(dynamicText)
+
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(dynamicText.opacity(0.5))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(dynamicText.opacity(0.35))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(dynamicText.opacity(0.06))
+            )
+        }
+        .buttonStyle(SquishyButtonStyle())
+        .disabled(isPicking)
     }
 }
 
