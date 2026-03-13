@@ -126,7 +126,7 @@ struct ReceiptReviewView: View {
 
                 Text(result.extractionStatus.rawValue)
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(result.extractionStatus == .aiEnhanced ? .green.opacity(0.85) : dynamicText.opacity(0.45))
+                    .foregroundColor(dynamicText.opacity(0.45))
 
                 if let merchant = result.merchantName {
                     Text(merchant)
