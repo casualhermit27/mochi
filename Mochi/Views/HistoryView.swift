@@ -22,6 +22,9 @@ struct HistoryView: View {
     @State private var pendingDeletions: [PersistentIdentifier: Date] = [:]
     @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
+    // Receipt Detail State
+
+    
     var isNightTime: Bool
     
     var currentTheme: SettingsManager.PastelTheme {
@@ -260,6 +263,7 @@ struct HistoryView: View {
                                                         }
                                                         
                                                         if let note = item.note, !note.isEmpty {
+                                                            // Standard Note
                                                             Text(note)
                                                                 .font(.system(size: 12, design: .monospaced))
                                                                 .foregroundColor(dynamicText.opacity(0.8))
@@ -792,6 +796,7 @@ struct HistoryView: View {
                 .presentationBackground(.regularMaterial)
                 .presentationDragIndicator(.hidden)
             }
+
             .sheet(isPresented: $subscription.showPaywall) {
                 PaywallView()
             }
@@ -1066,6 +1071,7 @@ struct HistoryView: View {
         undoSnapshots.removeAll()
         withAnimation { showUndoToast = false }
     }
+    
 }
 
 // MARK: - Undo Row Component

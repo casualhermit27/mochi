@@ -12,7 +12,7 @@ class SettingsManager: ObservableObject {
     // Let's use a String: "system", "auto", "light", "dark", "amoled".
     
     @AppStorage("themeMode") var themeMode: String = "system"
-    @AppStorage("colorTheme") var colorTheme: String = "default" // default, pink, blue, green, butterscotch, brown
+    @AppStorage("colorTheme") var colorTheme: String = "default" // default, pink, blue, green, butterscotch, brown, purple
     @AppStorage("customCurrencyCode") var customCurrencyCode: String = "" // Stores ISO code (e.g. "USD", "KRW")
     @AppStorage("widgetMatchTheme") var widgetMatchTheme: Bool = true // Should widget match app theme?
     
@@ -260,7 +260,18 @@ class SettingsManager: ObservableObject {
             textDark: Color(red: 0.92, green: 0.88, blue: 0.82)         // Light latte
         )
         
-        static let all: [PastelTheme] = [defaultTheme, pink, blue, green, butterscotch, brown]
+        static let purple = PastelTheme(
+            id: "purple",
+            name: "Lavender",
+            icon: "moon.stars.fill",
+            background: Color(red: 0.96, green: 0.94, blue: 1.0),       // Light lavender
+            backgroundDark: Color(red: 0.11, green: 0.09, blue: 0.18),  // Deep violet-black
+            accent: Color(red: 0.60, green: 0.40, blue: 0.90),          // Vibrant violet
+            text: Color(red: 0.32, green: 0.20, blue: 0.52),            // Dark purple
+            textDark: Color(red: 0.88, green: 0.82, blue: 1.0)          // Soft lavender white
+        )
+        
+        static let all: [PastelTheme] = [defaultTheme, pink, blue, green, butterscotch, brown, purple]
     }
     
     var currentPastelTheme: PastelTheme {

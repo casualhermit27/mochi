@@ -18,8 +18,6 @@ struct ReceiptReviewView: View {
 
     // MARK: Local State
     @State private var editableNote: String = ""
-    @State private var lineItems: [ReceiptLineItem] = []
-    @State private var addAsSingleTotal: Bool = true
     @State private var useReceiptDate: Bool = true
 
     // MARK: Computed
@@ -29,18 +27,15 @@ struct ReceiptReviewView: View {
     }
 
     private var defaultTotalNote: String {
-        result.billType ?? result.merchantName ?? ""
+        return result.merchantName ?? "Scanned Receipt"
+    }
+
+    private var displayStoreName: String {
+        result.merchantName ?? "Unknown Store"
     }
 
     private var finalAmount: Double {
-        if result.hasSelectableLineItems && !addAsSingleTotal {
-            return lineItems.filter(\.isSelected).reduce(0) { $0 + $1.amount }
-        }
         return result.totalAmount ?? 0
-    }
-
-    private var selectedCount: Int {
-        lineItems.filter(\.isSelected).count
     }
 
     private var dateFormatter: DateFormatter {
@@ -69,13 +64,7 @@ struct ReceiptReviewView: View {
                         headerSection
                         amountSection
 
-                        if result.hasSelectableLineItems {
-                            lineItemsSection
-                        }
-
-                        if addAsSingleTotal || !result.hasSelectableLineItems {
-                            noteSection
-                        }
+                        noteSection
 
                         if result.isBackdatedDate {
                             dateSection
@@ -109,8 +98,6 @@ struct ReceiptReviewView: View {
             }
         }
         .onAppear {
-            lineItems = result.lineItems
-            addAsSingleTotal = !result.hasSelectableLineItems
             editableNote = defaultTotalNote
         }
     }
@@ -169,101 +156,23 @@ struct ReceiptReviewView: View {
         }
     }
 
-    // MARK: - Line Items
-
-    private var lineItemsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Items Found")
-
-            // Segmented pill toggle
-            HStack(spacing: 0) {
-                pillOption("One Total", selected: addAsSingleTotal) {
-                    withAnimation(.spring(response: 0.28)) { addAsSingleTotal = true }
-                }
-                pillOption("Separate (\(selectedCount))", selected: !addAsSingleTotal) {
-                    withAnimation(.spring(response: 0.28)) { addAsSingleTotal = false }
-                }
-            }
-            .padding(3)
-            .background(dynamicText.opacity(0.06))
-            .clipShape(Capsule())
-
-            if !addAsSingleTotal {
-                VStack(spacing: 6) {
-                    ForEach(lineItems.indices, id: \.self) { i in
-                        lineItemRow(i)
-                    }
-                }
-                .padding(.top, 2)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func lineItemRow(_ index: Int) -> some View {
-        let item = lineItems[index]
-        HStack(spacing: 12) {
-            Image(systemName: item.isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 20))
-                .foregroundColor(item.isSelected ? accentColor : dynamicText.opacity(0.25))
-
-            Text(item.description)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundColor(item.isSelected ? dynamicText : dynamicText.opacity(0.35))
-                .lineLimit(1)
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(settings.currencySymbol)\(String(format: "%.2f", item.amount))")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundColor(item.isSelected ? dynamicText : dynamicText.opacity(0.35))
-
-                if let qty = item.quantity, let unit = item.unitPrice, qty > 0, unit > 0 {
-                    Text("\(String(format: "%.2f", qty)) x \(String(format: "%.2f", unit))")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(dynamicText.opacity(0.35))
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(dynamicText.opacity(item.isSelected ? 0.04 : 0.02))
-        )
-        .onTapGesture {
-            HapticManager.shared.selection()
-            withAnimation(.spring(response: 0.25)) {
-                lineItems[index].isSelected.toggle()
-            }
-        }
-    }
-
-    // MARK: - Note
+    // MARK: - Note (Visual Store Name input)
 
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("Bill Type")
+            sectionLabel("Bill Type/Store Name")
 
             HStack(spacing: 10) {
                 Image(systemName: "pencil")
                     .font(.system(size: 13))
                     .foregroundColor(accentColor)
 
+                // We only show the Merchant visually in standard text box if the user wants to change the store name
                 TextField("e.g. Restaurant, Grocery, Fuel", text: $editableNote)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundColor(dynamicText)
                     .tint(accentColor)
                     .submitLabel(.done)
-
-                if !editableNote.isEmpty {
-                    Button(action: { editableNote = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(dynamicText.opacity(0.28))
-                    }
-                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
@@ -275,6 +184,8 @@ struct ReceiptReviewView: View {
                             .stroke(accentColor.opacity(0.18), lineWidth: 1)
                     )
             )
+            
+
         }
     }
 
@@ -313,14 +224,8 @@ struct ReceiptReviewView: View {
     private func confirmAndSave() {
         HapticManager.shared.rigidImpact()
 
-        if result.hasSelectableLineItems && !addAsSingleTotal {
-            for item in lineItems.filter(\.isSelected) {
-                onSave(item.amount, item.description, finalDate)
-            }
-        } else {
-            let note = editableNote.isEmpty ? nil : editableNote
-            onSave(finalAmount, note, finalDate)
-        }
+        let note = editableNote.isEmpty ? nil : editableNote
+        onSave(finalAmount, note, finalDate)
 
         dismiss()
     }

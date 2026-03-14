@@ -3,6 +3,7 @@ import MessageUI
 import SwiftData
 import WidgetKit
 import RevenueCatUI
+import RevenueCat
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
@@ -173,7 +174,14 @@ struct SettingsView: View {
                             .accessibilityIdentifier("about_row")
                             .padding(.top, 16) // Extra rhythm separation
                             .padding(.horizontal, 20)
-                            
+
+                            // 6. Debug Controls
+                            NavigationLink(destination: DebugControlsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                MenuRow(icon: "ant.fill", title: "Debug Controls", value: "", dynamicText: dynamicText)
+                            }
+                            .accessibilityIdentifier("debug_controls_row")
+                            .padding(.horizontal, 20)
+
                             // Footer Anchor
                             VStack(spacing: 4) {
                                 Text("Mochi")
@@ -1333,5 +1341,173 @@ struct CloudSyncSettingsView: View {
         } message: {
             Text("We couldn't find any Mochi data in your iCloud account.")
         }
+    }
+}
+
+// MARK: - Debug Controls
+
+struct DebugControlsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let isNightTime: Bool
+
+    @Environment(\.dismiss) var dismiss
+    @State private var copiedRC = false
+
+    var accentColor: Color {
+        settings.colorTheme != "default" ? settings.currentPastelTheme.accent : Color(red: 0.35, green: 0.65, blue: 0.55)
+    }
+
+    var appVersion: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(v) (\(b))"
+    }
+    var iosVersion: String { UIDevice.current.systemVersion }
+    var deviceName: String { UIDevice.current.model }
+
+    var rcID: String { Purchases.shared.appUserID }
+    var rcIDTruncated: String {
+        guard rcID.count > 20 else { return rcID }
+        return "\(rcID.prefix(10))...\(rcID.suffix(10))"
+    }
+
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(dynamicText.opacity(0.1), lineWidth: 1))
+                    }
+                    Spacer()
+                    Text("Debug Controls")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 40, height: 40)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+
+                        // ── Copy RevenueCat ID ──
+                        VStack(alignment: .leading, spacing: 8) {
+                            Button(action: {
+                                UIPasteboard.general.string = rcID
+                                HapticManager.shared.success()
+                                withAnimation { copiedRC = true }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    withAnimation { copiedRC = false }
+                                }
+                            }) {
+                                HStack(spacing: 14) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(dynamicText.opacity(0.08))
+                                            .frame(width: 38, height: 38)
+                                        Image(systemName: copiedRC ? "checkmark" : "doc.on.doc")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundColor(copiedRC ? accentColor : dynamicText.opacity(0.7))
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(copiedRC ? "Copied!" : "Copy RevenueCat ID")
+                                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                            .foregroundColor(dynamicText)
+                                        Text(rcIDTruncated)
+                                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                            .foregroundColor(dynamicText.opacity(0.45))
+                                            .lineLimit(1)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 14)
+                                .background(dynamicText.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+
+                            Text("Copy this ID if you need help from support to investigate subscription issues.")
+                                .font(.system(size: 13, design: .rounded))
+                                .foregroundColor(dynamicText.opacity(0.45))
+                                .padding(.horizontal, 4)
+                        }
+
+                        // ── Device Information ──
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Device Information")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(dynamicText.opacity(0.45))
+                                .padding(.horizontal, 4)
+
+                            VStack(spacing: 0) {
+                                DebugInfoRow(icon: "app.badge", label: "App Version", value: appVersion, dynamicText: dynamicText)
+                                Divider()
+                                    .background(dynamicText.opacity(0.1))
+                                    .padding(.horizontal, 16)
+                                DebugInfoRow(icon: "iphone", label: "iOS Version", value: iosVersion, dynamicText: dynamicText)
+                                Divider()
+                                    .background(dynamicText.opacity(0.1))
+                                    .padding(.horizontal, 16)
+                                DebugInfoRow(icon: "person.text.rectangle", label: "Device Name", value: deviceName, dynamicText: dynamicText)
+                            }
+                            .background(dynamicText.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+
+                        Spacer(minLength: 40)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+struct DebugInfoRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    let dynamicText: Color
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(dynamicText.opacity(0.08))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(dynamicText.opacity(0.65))
+            }
+            Text(label)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .foregroundColor(dynamicText)
+            Spacer()
+            Text(value)
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundColor(dynamicText.opacity(0.45))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
     }
 }
