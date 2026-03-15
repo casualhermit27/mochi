@@ -24,6 +24,7 @@ struct MainContentView: View {
     @State private var addedAmount: Double = 0
     @State private var isNegativeDelta = false
     @State private var sessionDeletedAmount: Double = 0
+    @StateObject private var changelogManager = ChangelogManager.shared
     
     // Input State
     @State private var isInputActive = false
@@ -454,6 +455,17 @@ struct MainContentView: View {
                 .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(32)
         }
+        .sheet(isPresented: $changelogManager.showChangelog) {
+            ChangelogView(
+                dynamicText: dynamicText,
+                dynamicBackground: dynamicBackground,
+                accentColor: accentColor
+            )
+            .presentationDetents([.fraction(0.85)]) // Large enough but clearly a sheet
+            .presentationCornerRadius(32)
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled(true) // Force them to hit 'Continue' to acknowledge
+        }
 
         .sheet(isPresented: $showPaymentMethods) {
             NavigationStack {
@@ -569,6 +581,8 @@ struct MainContentView: View {
             updateWidgetData()
             // Ensure notifications are up to date
             notificationManager.scheduleNotifications()
+            // Check for changelog
+            changelogManager.checkVersion()
         }
         .onChange(of: items.count) { oldValue, newValue in
             // Update widget when items change
@@ -690,13 +704,13 @@ struct MainContentView: View {
         // Instant Add
         // Just use the label, no icon in history (User request)
         let note = preset.label
-        instantAdd(amount: preset.amount, note: note)
+        instantAdd(amount: preset.amount, note: note, paymentMethodId: preset.paymentMethodId)
     }
     
-    private func instantAdd(amount: Double, note: String) {
+    private func instantAdd(amount: Double, note: String, paymentMethodId: String? = nil) {
         HapticManager.shared.rigidImpact()
         
-        let methodId = settings.selectedPaymentMethod.id.uuidString
+        let methodId = paymentMethodId ?? settings.selectedPaymentMethod.id.uuidString
         let newItem = Item(timestamp: Date(), amount: amount, note: note, paymentMethodId: methodId)
         modelContext.insert(newItem)
         

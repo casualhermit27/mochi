@@ -12,6 +12,7 @@ struct SpeedDialSettingsView: View {
     @State private var editingKey: Int?
     @State private var editAmount = ""
     @State private var editLabel = ""
+    @State private var editPaymentMethodId: String?
     @State private var showEditSheet = false
 
     
@@ -77,9 +78,11 @@ struct SpeedDialSettingsView: View {
                                 if let preset = settings.speedDialPresets[num] {
                                     editAmount = String(format: "%.2f", preset.amount)
                                     editLabel = preset.label
+                                    editPaymentMethodId = preset.paymentMethodId
                                 } else {
                                     editAmount = ""
                                     editLabel = ""
+                                    editPaymentMethodId = nil
                                 }
                                 showEditSheet = true
                                 HapticManager.shared.lightImpact()
@@ -135,6 +138,62 @@ struct SpeedDialSettingsView: View {
                             .background(dynamicText.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .foregroundColor(dynamicText)
+                            
+                        // Payment Type Selector
+                        HStack {
+                            Text("Payment Type")
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .foregroundColor(dynamicText.opacity(0.8))
+                            Spacer()
+                            Menu {
+                                Button {
+                                    editPaymentMethodId = nil
+                                } label: {
+                                    HStack {
+                                        Text("App Default")
+                                        if editPaymentMethodId == nil {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                                ForEach(settings.paymentMethods) { method in
+                                    Button {
+                                        editPaymentMethodId = method.id.uuidString
+                                    } label: {
+                                        HStack {
+                                            Text(method.name)
+                                            if editPaymentMethodId == method.id.uuidString {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if let methodId = editPaymentMethodId, let method = settings.paymentMethods.first(where: { $0.id.uuidString == methodId }) {
+                                        Image(systemName: method.type.icon)
+                                            .foregroundColor(method.color)
+                                        Text(method.name)
+                                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText)
+                                    } else {
+                                        Text("App Default")
+                                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                                            .foregroundColor(dynamicText.opacity(0.5))
+                                    }
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(dynamicText.opacity(0.3))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(dynamicText.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                        .padding()
+                        .background(dynamicText.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                     .padding(.horizontal, 24)
                     
@@ -170,7 +229,7 @@ struct SpeedDialSettingsView: View {
     
     private func savePreset() {
         guard let key = editingKey, let amount = Double(editAmount) else { return }
-        let preset = SettingsManager.SpeedDialPreset(amount: amount, label: editLabel, icon: "")
+        let preset = SettingsManager.SpeedDialPreset(amount: amount, label: editLabel, icon: "", paymentMethodId: editPaymentMethodId)
         settings.speedDialPresets[key] = preset
         showEditSheet = false
         HapticManager.shared.success()
