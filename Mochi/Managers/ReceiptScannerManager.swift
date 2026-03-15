@@ -408,10 +408,55 @@ final class ReceiptScannerManager {
             return best.value
         }
 
+        func candidateAmountsBelow(keywordBox: CGRect) -> [(value: Double, box: CGRect)] {
+            let keywordWidth = max(keywordBox.width, 0.001)
+            let columnMinX = keywordBox.minX - keywordWidth * 0.2
+            let columnMaxX = keywordBox.maxX + keywordWidth * 0.2
+            let rowTokens = normalizedTokens.filter { token in
+                guard token.box.minY > keywordBox.maxY else { return false }
+                let overlapsColumn = token.box.midX >= columnMinX && token.box.midX <= columnMaxX
+                let isNearBelow = token.box.minY - keywordBox.maxY < keywordBox.height * 3.0
+                return overlapsColumn && isNearBelow
+            }.sorted(by: { $0.box.minY < $1.box.minY })
+
+            var candidates: [(Double, CGRect)] = []
+            for (idx, token) in rowTokens.enumerated() {
+                if let value = normalizedAmount(from: token.text) {
+                    candidates.append((value, token.box))
+                }
+
+                // Try merging with up to two following tokens on the same row
+                var mergedText = token.text
+                var mergedBox = token.box
+                for j in (idx + 1)..<min(idx + 3, rowTokens.count) {
+                    let next = rowTokens[j]
+                    if abs(next.box.midY - token.box.midY) > max(next.box.height, token.box.height) * 0.8 {
+                        break
+                    }
+                    if horizontalGap(mergedBox, next.box) > max(mergedBox.width, next.box.width) * 0.8 {
+                        break
+                    }
+                    mergedText += " \(next.text)"
+                    mergedBox = mergedBox.union(next.box)
+                    if let value = normalizedAmount(from: mergedText) {
+                        candidates.append((value, mergedBox))
+                    }
+                }
+            }
+            return candidates
+        }
+
         let grandBoxes = findKeywordBoxes(isGrand: true).sorted(by: { $0.minY < $1.minY })
         for box in grandBoxes {
             if let value = pickClosestRightAmount(for: box) {
                 return value
+            }
+            // If no right-side amount, allow below-column for GRAND TOTAL only
+            if !rowHasSkipKeywords(box) {
+                let belowCandidates = candidateAmountsBelow(keywordBox: box)
+                if let best = belowCandidates.min(by: { $0.box.minY < $1.box.minY }) {
+                    return best.value
+                }
             }
         }
 
