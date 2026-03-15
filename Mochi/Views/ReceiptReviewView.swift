@@ -98,7 +98,7 @@ struct ReceiptReviewView: View {
                         .fill(dynamicText.opacity(0.06))
                         .frame(height: 1)
 
-                    Button(action: confirmAndSave) {
+                    Button(action: { confirmAndSave() }) {
                         Text("Add to Mochi")
                             .font(.system(size: 18, weight: .semibold, design: .monospaced))
                             .foregroundColor(isNightTime ? .black : .white)
@@ -146,10 +146,6 @@ struct ReceiptReviewView: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(dynamicText)
 
-                Text(result.extractionStatus.rawValue)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(dynamicText.opacity(0.45))
-
                 if let merchant = result.merchantName {
                     Text(merchant)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -190,6 +186,10 @@ struct ReceiptReviewView: View {
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
             }
+            
+            Text("OCR is ~90% accurate. Please verify before saving.")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(dynamicText.opacity(0.4))
         }
     }
 

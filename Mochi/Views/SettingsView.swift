@@ -292,7 +292,9 @@ struct AppearanceSettingsView: View {
                 HStack {
                     Button(action: {
                         HapticManager.shared.softSquish()
-                        dismiss()
+                        if !isRestoring {
+                            dismiss()
+                        }
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .bold)) // Slightly bolder
@@ -1245,6 +1247,7 @@ struct CloudSyncSettingsView: View {
                                     .stroke(dynamicText.opacity(0.1), lineWidth: 1) // Border
                             )
                     }
+                    .opacity(isRestoring ? 0.4 : 1.0)
                     Spacer()
                     Text("Cloud Sync")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
@@ -1325,6 +1328,25 @@ struct CloudSyncSettingsView: View {
                         }
                     }
                     .padding(.top, 12)
+                }
+            }
+            
+            if isRestoring {
+                ZStack {
+                    Color.black.opacity(0.25).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        MochiSpinner(size: 28)
+                        Text("Restoring from iCloud…")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundColor(dynamicText)
+                        Text("Please keep Mochi open.")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(dynamicText.opacity(0.6))
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 18)
+                    .background(dynamicBackground.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
