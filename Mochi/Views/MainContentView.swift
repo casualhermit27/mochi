@@ -62,19 +62,23 @@ struct MainContentView: View {
     
     var dailyTotal: Double {
         let currentRitualDay = settings.getRitualDay(for: Date())
-        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
+        let todayItems = items.filter {
+            settings.getRitualDay(for: $0.timestamp) == currentRitualDay && settings.isItemInActiveCurrency($0)
+        }
         return todayItems.reduce(0) { $0 + $1.amount }
     }
     
     var yesterdayTotal: Double {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let yesterdayRitualDay = settings.getRitualDay(for: yesterday)
-        let yesterdayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == yesterdayRitualDay }
+        let yesterdayItems = items.filter {
+            settings.getRitualDay(for: $0.timestamp) == yesterdayRitualDay && settings.isItemInActiveCurrency($0)
+        }
         return yesterdayItems.reduce(0) { $0 + $1.amount }
     }
     
     func updateWidgetData(includeLastTransaction: Bool = true) {
-        let lastItem = items.first
+        let lastItem = items.first(where: { settings.isItemInActiveCurrency($0) })
         let lastTransactionAmount = lastItem?.amount ?? 0
         let lastTransactionNote = lastItem?.note ?? ""
         
@@ -493,7 +497,7 @@ struct MainContentView: View {
             .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPickerView { image in
+            DocumentScannerView { image in
                 showCamera = false
                 processScannedImage(image)
             }
@@ -697,7 +701,13 @@ struct MainContentView: View {
         HapticManager.shared.rigidImpact()
         
         let methodId = settings.selectedPaymentMethod.id.uuidString
-        let newItem = Item(timestamp: Date(), amount: amount, note: note, paymentMethodId: methodId)
+        let newItem = Item(
+            timestamp: Date(),
+            amount: amount,
+            note: note,
+            paymentMethodId: methodId,
+            currencyCode: settings.activeCurrencyCode
+        )
         modelContext.insert(newItem)
         
         // Update Undo State
@@ -752,7 +762,13 @@ struct MainContentView: View {
         HapticManager.shared.rigidImpact()
         
         let methodId = settings.selectedPaymentMethod.id.uuidString
-        let newItem = Item(timestamp: Date(), amount: amount, note: currentNote.isEmpty ? nil : currentNote, paymentMethodId: methodId)
+        let newItem = Item(
+            timestamp: Date(),
+            amount: amount,
+            note: currentNote.isEmpty ? nil : currentNote,
+            paymentMethodId: methodId,
+            currencyCode: settings.activeCurrencyCode
+        )
         modelContext.insert(newItem)
         
         // Update Undo State
@@ -818,11 +834,17 @@ struct MainContentView: View {
         }
     }
 
-    private func saveReceiptEntry(amount: Double, note: String?, date: Date) {
+    private func saveReceiptEntry(amount: Double, note: String?, date: Date, currencyCode: String?) {
         guard amount > 0 else { return }
 
         let methodId = settings.selectedPaymentMethod.id.uuidString
-        let newItem = Item(timestamp: date, amount: amount, note: note, paymentMethodId: methodId)
+        let newItem = Item(
+            timestamp: date,
+            amount: amount,
+            note: note,
+            paymentMethodId: methodId,
+            currencyCode: currencyCode ?? settings.activeCurrencyCode
+        )
         modelContext.insert(newItem)
 
         lastAddedItem = newItem

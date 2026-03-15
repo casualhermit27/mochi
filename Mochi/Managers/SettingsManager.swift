@@ -310,6 +310,25 @@ class SettingsManager: ObservableObject {
         }
         return Locale.autoupdatingCurrent.currency?.identifier ?? "USD"
     }
+
+    func currencySymbol(for currencyCode: String?) -> String {
+        guard let code = currencyCode, !code.isEmpty else { return currencySymbol }
+        if let currency = SettingsManager.allAvailableCurrencies.first(where: { $0.code == code }) {
+            return currency.symbol
+        }
+        return code
+    }
+
+    func normalizedCurrencyCode(for item: Item) -> String {
+        if let code = item.currencyCode, !code.isEmpty {
+            return code
+        }
+        return activeCurrencyCode
+    }
+
+    func isItemInActiveCurrency(_ item: Item) -> Bool {
+        return normalizedCurrencyCode(for: item) == activeCurrencyCode
+    }
     
     // Currency Model
     struct Currency: Hashable, Identifiable {
@@ -529,4 +548,3 @@ class CloudSyncManager: NSObject {
         return false // If they are not castable exactly this way or mismatch, assume not equal
     }
 }
-

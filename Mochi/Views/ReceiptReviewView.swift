@@ -1,5 +1,9 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
+#if canImport(VisionKit)
+import VisionKit
+#endif
 
 // MARK: - ReceiptReviewView
 
@@ -11,7 +15,7 @@ struct ReceiptReviewView: View {
     let isNightTime: Bool
 
     let result: ReceiptScanResult
-    let onSave: (Double, String?, Date) -> Void
+    let onSave: (Double, String?, Date, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var settings = SettingsManager.shared
@@ -19,11 +23,16 @@ struct ReceiptReviewView: View {
     // MARK: Local State
     @State private var editableNote: String = ""
     @State private var useReceiptDate: Bool = true
+    @State private var editableAmountText: String = ""
+    @State private var manualDate: Date = Date()
 
     // MARK: Computed
 
     private var finalDate: Date {
-        useReceiptDate ? (result.receiptDate ?? Date()) : Date()
+        if useReceiptDate, let receiptDate = result.receiptDate, result.isDateReliable {
+            return receiptDate
+        }
+        return manualDate
     }
 
     private var defaultTotalNote: String {
@@ -31,11 +40,19 @@ struct ReceiptReviewView: View {
     }
 
     private var displayStoreName: String {
-        result.merchantName ?? "Unknown Store"
+        if !editableNote.isEmpty { return editableNote }
+        return result.merchantName ?? "Unknown Store"
     }
 
     private var finalAmount: Double {
-        return result.totalAmount ?? 0
+        let cleaned = editableAmountText
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return Double(cleaned) ?? 0
+    }
+
+    private var displayCurrencySymbol: String {
+        settings.currencySymbol(for: result.currencyCode)
     }
 
     private var dateFormatter: DateFormatter {
@@ -66,7 +83,7 @@ struct ReceiptReviewView: View {
 
                         noteSection
 
-                        if result.isBackdatedDate {
+                        if !result.isDateReliable || result.isBackdatedDate {
                             dateSection
                         }
                     }
@@ -99,6 +116,12 @@ struct ReceiptReviewView: View {
         }
         .onAppear {
             editableNote = defaultTotalNote
+            if editableAmountText.isEmpty {
+                let amount = result.totalAmount ?? 0
+                editableAmountText = String(format: "%.2f", amount)
+            }
+            manualDate = result.receiptDate ?? Date()
+            useReceiptDate = result.receiptDate != nil && result.isDateReliable
         }
     }
 
@@ -143,15 +166,17 @@ struct ReceiptReviewView: View {
             sectionLabel("Amount")
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(settings.currencySymbol)
+                Text(displayCurrencySymbol)
                     .font(.system(size: 28, weight: .medium, design: .monospaced))
                     .foregroundColor(dynamicText.opacity(0.45))
 
-                Text(String(format: "%.2f", finalAmount))
+                TextField("0.00", text: $editableAmountText)
                     .font(.system(size: 52, weight: .semibold, design: .monospaced))
                     .foregroundColor(dynamicText)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: finalAmount)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.leading)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
             }
         }
     }
@@ -195,24 +220,31 @@ struct ReceiptReviewView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("Add to which day?")
 
-            HStack(spacing: 0) {
-                if let receiptDate = result.receiptDate {
+            if let receiptDate = result.receiptDate, result.isDateReliable {
+                HStack(spacing: 0) {
                     pillOption(dateFormatter.string(from: receiptDate), selected: useReceiptDate) {
                         HapticManager.shared.selection()
                         withAnimation(.spring(response: 0.28)) { useReceiptDate = true }
                     }
+                    pillOption("Today", selected: !useReceiptDate) {
+                        HapticManager.shared.selection()
+                        withAnimation(.spring(response: 0.28)) { useReceiptDate = false }
+                    }
                 }
-                pillOption("Today", selected: !useReceiptDate) {
-                    HapticManager.shared.selection()
-                    withAnimation(.spring(response: 0.28)) { useReceiptDate = false }
-                }
-            }
-            .padding(3)
-            .background(dynamicText.opacity(0.06))
-            .clipShape(Capsule())
+                .padding(3)
+                .background(dynamicText.opacity(0.06))
+                .clipShape(Capsule())
 
-            if let receiptDate = result.receiptDate {
                 Text("Receipt date: \(dateFormatter.string(from: receiptDate))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(dynamicText.opacity(0.35))
+            } else {
+                DatePicker("Select date", selection: $manualDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(accentColor)
+
+                Text("Receipt date not found. Please select a date.")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(dynamicText.opacity(0.35))
             }
@@ -225,7 +257,7 @@ struct ReceiptReviewView: View {
         HapticManager.shared.rigidImpact()
 
         let note = editableNote.isEmpty ? nil : editableNote
-        onSave(finalAmount, note, finalDate)
+        onSave(finalAmount, note, finalDate, result.currencyCode)
 
         dismiss()
     }
@@ -254,9 +286,48 @@ struct ReceiptReviewView: View {
     }
 }
 
-// MARK: - CameraPickerView
+// MARK: - DocumentScannerView
 
-struct CameraPickerView: UIViewControllerRepresentable {
+#if canImport(VisionKit)
+struct DocumentScannerView: UIViewControllerRepresentable {
+    let onImageSelected: (UIImage) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let controller = VNDocumentCameraViewController()
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
+
+    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let parent: DocumentScannerView
+        init(_ parent: DocumentScannerView) { self.parent = parent }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFinishWith scan: VNDocumentCameraScan) {
+            if scan.pageCount > 0 {
+                let image = scan.imageOfPage(at: 0)
+                parent.onImageSelected(image)
+            }
+            controller.dismiss(animated: true)
+        }
+
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
+            controller.dismiss(animated: true)
+        }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFailWithError error: Error) {
+            controller.dismiss(animated: true)
+        }
+    }
+}
+#else
+// Fallback for platforms without VisionKit.
+struct DocumentScannerView: UIViewControllerRepresentable {
     let onImageSelected: (UIImage) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -271,8 +342,8 @@ struct CameraPickerView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
     final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: CameraPickerView
-        init(_ parent: CameraPickerView) { self.parent = parent }
+        let parent: DocumentScannerView
+        init(_ parent: DocumentScannerView) { self.parent = parent }
 
         func imagePickerController(_ picker: UIImagePickerController,
                                    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
@@ -287,6 +358,7 @@ struct CameraPickerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif
 
 // MARK: - PhotoLibraryPickerView
 
@@ -315,10 +387,23 @@ struct PhotoLibraryPickerView: UIViewControllerRepresentable {
             guard let provider = results.first?.itemProvider,
                   provider.canLoadObject(ofClass: UIImage.self) else { return }
 
-            provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
-                DispatchQueue.main.async {
-                    if let image = object as? UIImage {
-                        self?.parent.onImageSelected(image)
+            let typeId = UTType.image.identifier
+            if provider.hasItemConformingToTypeIdentifier(typeId) {
+                provider.loadFileRepresentation(forTypeIdentifier: typeId) { [weak self] url, _ in
+                    guard let url else { return }
+                    if let data = try? Data(contentsOf: url),
+                       let image = UIImage(data: data) {
+                        DispatchQueue.main.async {
+                            self?.parent.onImageSelected(image)
+                        }
+                    }
+                }
+            } else {
+                provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+                    DispatchQueue.main.async {
+                        if let image = object as? UIImage {
+                            self?.parent.onImageSelected(image)
+                        }
                     }
                 }
             }

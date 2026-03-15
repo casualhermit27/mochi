@@ -416,14 +416,18 @@ struct LoggingSettingsView: View {
 
     var dailyTotal: Double {
         let currentRitualDay = settings.getRitualDay(for: Date())
-        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
+        let todayItems = items.filter {
+            settings.getRitualDay(for: $0.timestamp) == currentRitualDay && settings.isItemInActiveCurrency($0)
+        }
         return todayItems.reduce(0) { $0 + $1.amount }
     }
     
     var yesterdayTotal: Double {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let yesterdayRitualDay = settings.getRitualDay(for: yesterday)
-        let yesterdayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == yesterdayRitualDay }
+        let yesterdayItems = items.filter {
+            settings.getRitualDay(for: $0.timestamp) == yesterdayRitualDay && settings.isItemInActiveCurrency($0)
+        }
         return yesterdayItems.reduce(0) { $0 + $1.amount }
     }
     

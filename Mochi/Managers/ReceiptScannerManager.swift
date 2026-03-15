@@ -16,6 +16,8 @@ struct ReceiptScanResult {
     let billType: String?
     let totalAmount: Double?
     let receiptDate: Date?
+    let isDateReliable: Bool
+    let currencyCode: String?
     let extractionStatus: ExtractionStatus
 
     var isBackdatedDate: Bool {
@@ -41,7 +43,9 @@ final class ReceiptScannerManager {
     }
 
     func scan(image: UIImage) async throws -> ReceiptScanResult {
-        guard let cgImage = image.cgImage else { throw ScanError.invalidImage }
+        let preprocessed = preprocessImageForOCR(image)
+        guard let cgImage = preprocessed ?? image.cgImage else { throw ScanError.invalidImage }
+        let orientation: CGImagePropertyOrientation = (preprocessed != nil) ? .up : image.cgImageOrientation
         
         return try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
@@ -72,16 +76,59 @@ final class ReceiptScannerManager {
             }
             
             request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
+            request.usesLanguageCorrection = false
             request.recognitionLanguages = ["en-US", "en-GB", "ar-AE"]
             
-            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: image.cgImageOrientation, options: [:])
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
             do {
                 try handler.perform([request])
             } catch {
                 continuation.resume(throwing: error)
             }
         }
+    }
+
+    private func preprocessImageForOCR(_ image: UIImage) -> CGImage? {
+        guard let ciImage = CIImage(image: image) else { return nil }
+
+        let oriented = ciImage.oriented(forExifOrientation: Int32(image.cgImageOrientation.rawValue))
+
+        var processed = oriented
+
+        let targetWidth: CGFloat = 1600
+        if processed.extent.width > 0, processed.extent.width < targetWidth {
+            let scale = targetWidth / processed.extent.width
+            if let scaled = processed.applyingFilter(
+                "CILanczosScaleTransform",
+                parameters: ["inputScale": scale, "inputAspectRatio": 1.0]
+            ) as CIImage? {
+                processed = scaled
+            }
+        }
+
+        if let contrast = processed.applyingFilter(
+            "CIColorControls",
+            parameters: ["inputSaturation": 0.0, "inputContrast": 1.25, "inputBrightness": 0.0]
+        ) as CIImage? {
+            processed = contrast
+        }
+
+        if let exposure = processed.applyingFilter(
+            "CIExposureAdjust",
+            parameters: ["inputEV": 0.35]
+        ) as CIImage? {
+            processed = exposure
+        }
+
+        if let sharpen = processed.applyingFilter(
+            "CISharpenLuminance",
+            parameters: ["inputSharpness": 0.4]
+        ) as CIImage? {
+            processed = sharpen
+        }
+
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        return context.createCGImage(processed, from: processed.extent)
     }
 
     // MARK: - Parsing Logic
@@ -124,13 +171,16 @@ final class ReceiptScannerManager {
         let lines = reconstructLines(from: tokens)
         
         // Find Date
-        let receiptDate = parseDate(from: lines)
+        let (receiptDate, isDateReliable) = parseDate(from: lines)
         
         // Find Merchant Name (usually the first few lines)
         let merchantName = parseMerchantName(lines: lines)
         
         // Find Total
         let totalAmount = parseGrandTotal(tokens: tokens)
+
+        // Detect Currency
+        let currencyCode = parseCurrencyCode(lines: lines)
         
         // Deduce bill type
         let billType = parseBillType(lines: lines, merchantName: merchantName)
@@ -141,8 +191,41 @@ final class ReceiptScannerManager {
             billType: billType,
             totalAmount: totalAmount,
             receiptDate: receiptDate,
+            isDateReliable: isDateReliable,
+            currencyCode: currencyCode,
             extractionStatus: .ocrOnly
         )
+    }
+
+    private func parseCurrencyCode(lines: [String]) -> String? {
+        let explicitCodes = [
+            "AED", "INR", "USD", "EUR", "GBP", "SAR", "QAR", "KWD", "BHD", "OMR",
+            "JPY", "CNY", "SGD", "HKD", "AUD", "CAD", "CHF", "SEK", "NOK", "DKK",
+            "ZAR", "THB", "MYR", "IDR", "PHP", "KRW"
+        ]
+
+        var scores: [String: Int] = [:]
+
+        for line in lines {
+            let upper = line.uppercased()
+
+            for code in explicitCodes where upper.contains(code) {
+                scores[code, default: 0] += 3
+            }
+
+            if line.contains("₹") || upper.contains(" INR ") || upper.contains("RS.") || upper.contains("RS ") {
+                scores["INR", default: 0] += 2
+            }
+            if line.contains("د.إ") || upper.contains(" AED ") {
+                scores["AED", default: 0] += 2
+            }
+            if line.contains("€") { scores["EUR", default: 0] += 1 }
+            if line.contains("£") { scores["GBP", default: 0] += 1 }
+            if line.contains("¥") { scores["JPY", default: 0] += 1 }
+            if line.contains("$") { scores["USD", default: 0] += 1 }
+        }
+
+        return scores.max(by: { $0.value < $1.value })?.key
     }
 
     private func reconstructLinesStrict(from tokens: [(text: String, box: CGRect)]) -> [String] {
@@ -175,83 +258,135 @@ final class ReceiptScannerManager {
     }
 
     private func parseGrandTotal(tokens: [(text: String, box: CGRect)]) -> Double? {
-        let lines = reconstructLinesStrict(from: tokens)
+        let skipKeywords = [
+            "cash", "change", "tendered", "credit", "credit note", "card", "visa", "mastercard",
+            "subtotal", "sub total", "tax", "vat", "gst", "discount", "savings", "tip", "gratuity",
+            "service", "round", "rounding"
+        ]
 
-        // DEBUG: print all reconstructed lines so we can see what OCR produced
-        print("=== RECEIPT OCR LINES ===")
-        for (i, l) in lines.enumerated() { print("[\(i)] \(l)") }
-        print("=========================")
-
-        // Normalize all lines (fix OCR space-decimals like "184 28" -> "184.28")
-        let normalizedLines = lines.map {
-            $0.replacingOccurrences(of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#, with: ".", options: .regularExpression)
+        // Normalize tokens for matching
+        let normalizedTokens: [(text: String, box: CGRect, lower: String, compact: String)] = tokens.map {
+            let lower = $0.text.lowercased()
+            let compact = lower.replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression)
+            return ($0.text, $0.box, lower, compact)
         }
 
-        // Exact keyword sets by priority
-        let highPriorityKeywords = ["grand total", "net pay", "amount due", "amount payable", "tax inclusive"]
-        let lowPriorityKeywords  = ["total", "balance due", "sub total", "subtotal"]
-        let skipKeywords         = ["change", "cash", "credit", "card", "visa", "mastercard", "tendered", "discount", "vat"]
-
-        // Helper: extract the last (rightmost) valid currency number from a line
-        func extractLastAmount(_ line: String) -> Double? {
-            let result = extractAllCurrencies(from: line).last
-            print("  extractLastAmount('\(line)') = \(String(describing: result))")
-            return result
-        }
-
-        // PASS 1 – High priority: scan ONLY the exact matching line
-        for (i, line) in normalizedLines.enumerated() {
-            let lower = line.lowercased()
-            guard highPriorityKeywords.contains(where: { lower.contains($0) }) else { continue }
-            if skipKeywords.contains(where: { lower.contains($0) }) { continue }
-
-            print("PASS1 HIGH match line[\(i)]: \(line)")
-            if let amount = extractLastAmount(line) {
-                print("PASS1 returning \(amount) from line itself")
-                return amount
+        func tokensNearRow(of box: CGRect) -> [(text: String, box: CGRect, lower: String, compact: String)] {
+            normalizedTokens.filter { token in
+                let overlap = max(0, min(token.box.maxY, box.maxY) - max(token.box.minY, box.minY))
+                let height = max(token.box.height, box.height)
+                return overlap > height * 0.2 || abs(token.box.midY - box.midY) < height * 0.6
             }
+        }
 
-            if i + 1 < normalizedLines.count {
-                let nextLine = normalizedLines[i + 1]
-                let nextLower = nextLine.lowercased()
-                print("PASS1 trying next line[\(i+1)]: \(nextLine)")
-                if !skipKeywords.contains(where: { nextLower.contains($0) }),
-                   let amount = extractLastAmount(nextLine) {
-                    print("PASS1 returning \(amount) from next line")
-                    return amount
+        func rowHasSkipKeywords(_ box: CGRect) -> Bool {
+            let rowTokens = tokensNearRow(of: box)
+            let rowText = rowTokens.map { $0.lower }.joined(separator: " ")
+            return skipKeywords.contains(where: { rowText.contains($0) })
+        }
+
+        func findKeywordBox(isGrand: Bool) -> CGRect? {
+            var best: CGRect? = nil
+            for token in normalizedTokens {
+                if isGrand {
+                    if token.compact.contains("grandtotal") {
+                        best = token.box
+                        break
+                    }
+                    if token.compact.contains("grand") {
+                        for other in normalizedTokens {
+                            let overlap = max(0, min(token.box.maxY, other.box.maxY) - max(token.box.minY, other.box.minY))
+                            let height = max(token.box.height, other.box.height)
+                            if overlap > height * 0.2 || abs(token.box.midY - other.box.midY) < height * 0.6 {
+                                if other.compact == "total" || other.compact.contains("total") {
+                                    let union = token.box.union(other.box)
+                                    if best == nil || union.minY > best!.minY {
+                                        best = union
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if token.compact.contains("subtotal") || token.compact.contains("subtot") {
+                        continue
+                    }
+                    if token.compact == "total" || token.compact.contains("total") {
+                        best = token.box
+                        break
+                    }
+                    // Handle "invoice total", "total inclusive", etc.
+                    if token.compact.contains("total") {
+                        best = token.box
+                        break
+                    }
                 }
             }
-        }
-
-        // PASS 2 – Low priority total keyword: scan ONLY the exact matching line
-        var lowCandidates: [Double] = []
-        for (i, line) in normalizedLines.enumerated() {
-            let lower = line.lowercased()
-            guard lowPriorityKeywords.contains(where: { lower.contains($0) }) else { continue }
-            if skipKeywords.contains(where: { lower.contains($0) }) { continue }
-
-            print("PASS2 LOW match line[\(i)]: \(line)")
-            if let amount = extractLastAmount(line) {
-                lowCandidates.append(amount)
-            } else if i + 1 < normalizedLines.count {
-                let nextLine = normalizedLines[i + 1]
-                let nextLower = nextLine.lowercased()
-                if !skipKeywords.contains(where: { nextLower.contains($0) }),
-                   let amount = extractLastAmount(nextLine) {
-                    lowCandidates.append(amount)
-                }
-            }
-        }
-        if let best = lowCandidates.max() {
-            print("PASS2 returning best lowCandidate: \(best)")
             return best
         }
 
-        // PASS 3 – Absolute fallback: largest single currency value anywhere on the receipt
-        let allAmounts = normalizedLines.flatMap { extractAllCurrencies(from: $0) }
-        let fallback = allAmounts.filter { $0 > 0 && $0 < 500_000 }.max()
-        print("PASS3 fallback returning: \(String(describing: fallback))")
-        return fallback
+        func normalizedAmount(from text: String) -> Double? {
+            let cleaned = text
+                .replacingOccurrences(of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: #"[₹$€£¥]|Rs\.?|AED|USD|INR|SAR|QAR|KWD|BHD|OMR|\s+"#, with: "", options: [.regularExpression, .caseInsensitive])
+                .replacingOccurrences(of: ",", with: ".")
+            if let value = Double(cleaned) { return value }
+            // Handle numbers with multiple dots (1.234.56)
+            let parts = cleaned.components(separatedBy: ".")
+            if parts.count > 2 {
+                let whole = parts.dropLast().joined()
+                let frac = parts.last!
+                return Double("\(whole).\(frac)")
+            }
+            return nil
+        }
+
+        func candidateAmounts(toRightOf keywordBox: CGRect) -> [(value: Double, box: CGRect)] {
+            var candidates: [(Double, CGRect)] = []
+            for token in normalizedTokens {
+                guard token.box.minX > keywordBox.maxX + 0.01 else { continue }
+                let overlap = max(0, min(token.box.maxY, keywordBox.maxY) - max(token.box.minY, keywordBox.minY))
+                let height = max(token.box.height, keywordBox.height)
+                guard overlap > height * 0.2 || abs(token.box.midY - keywordBox.midY) < height * 0.6 else { continue }
+
+                // Try direct parse
+                if let value = normalizedAmount(from: token.text) {
+                    candidates.append((value, token.box))
+                    continue
+                }
+
+                // Try merge with immediate right token for space-decimals (e.g., "3" "26")
+                let rightTokens = normalizedTokens.filter {
+                    $0.box.minX > token.box.maxX &&
+                    (abs($0.box.midY - token.box.midY) < max($0.box.height, token.box.height) * 0.6)
+                }
+                if let nearestRight = rightTokens.min(by: { $0.box.minX < $1.box.minX }) {
+                    let merged = "\(token.text) \(nearestRight.text)"
+                    if let value = normalizedAmount(from: merged) {
+                        let mergedBox = token.box.union(nearestRight.box)
+                        candidates.append((value, mergedBox))
+                    }
+                }
+            }
+            return candidates
+        }
+
+        func pickClosestRightAmount(for keywordBox: CGRect) -> Double? {
+            if rowHasSkipKeywords(keywordBox) { return nil }
+            let candidates = candidateAmounts(toRightOf: keywordBox)
+            guard let best = candidates.min(by: { $0.box.minX < $1.box.minX }) else { return nil }
+            return best.value
+        }
+
+        if let grandBox = findKeywordBox(isGrand: true) {
+            return pickClosestRightAmount(for: grandBox)
+        }
+
+        if let totalBox = findKeywordBox(isGrand: false) {
+            return pickClosestRightAmount(for: totalBox)
+        }
+
+        return nil
     }
 
     // MARK: - Currency Parsing
@@ -351,21 +486,23 @@ final class ReceiptScannerManager {
         return best?.label
     }
 
-    private func parseDate(from lines: [String]) -> Date? {
+    private func parseDate(from lines: [String]) -> (Date?, Bool) {
         let text = lines.joined(separator: " ")
         let pattern = #"\b(\d{1,2})[\/\-\.]([0-9]{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\/\-\.](\d{2,4})\b"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return (nil, false) }
         
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         let matchStr = (text as NSString).substring(with: match.range).replacingOccurrences(of: ".", with: "/").replacingOccurrences(of: "-", with: "/")
+        let parts = matchStr.split(separator: "/")
+        let hasFourDigitYear = parts.last?.count == 4
         
         for format in ["dd/MM/yyyy", "dd/MMM/yy", "MM/dd/yyyy", "yyyy/MM/dd"] {
             df.dateFormat = format
-            if let date = df.date(from: matchStr) { return date }
+            if let date = df.date(from: matchStr) { return (date, hasFourDigitYear) }
         }
-        return nil
+        return (nil, false)
     }
 }
 

@@ -41,7 +41,7 @@ struct ContentView: View {
 
     private func addItem() {
         withAnimation {
-            let newItem = Item(timestamp: Date(), amount: 0.0)
+            let newItem = Item(timestamp: Date(), amount: 0.0, currencyCode: SettingsManager.shared.activeCurrencyCode)
             modelContext.insert(newItem)
         }
     }

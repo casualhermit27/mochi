@@ -7,11 +7,13 @@ final class Item {
     var amount: Double = 0.0
     var note: String? // The tag/note
     var paymentMethodId: String? // UUID string of the PaymentMethod used
+    var currencyCode: String? // ISO 4217 currency code (e.g. "USD", "INR")
     
-    init(timestamp: Date = Date(), amount: Double = 0.0, note: String? = nil, paymentMethodId: String? = nil) {
+    init(timestamp: Date = Date(), amount: Double = 0.0, note: String? = nil, paymentMethodId: String? = nil, currencyCode: String? = nil) {
         self.timestamp = timestamp
         self.amount = amount
         self.note = note
         self.paymentMethodId = paymentMethodId
+        self.currencyCode = currencyCode
     }
 }

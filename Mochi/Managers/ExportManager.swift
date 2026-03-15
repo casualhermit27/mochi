@@ -17,7 +17,7 @@ class ExportManager {
             let date = dateFormatter.string(from: item.timestamp)
             let time = timeFormatter.string(from: item.timestamp)
             let amount = String(format: "%.2f", item.amount)
-            let currency = settings.activeCurrencyCode
+            let currency = item.currencyCode ?? settings.activeCurrencyCode
             let method = settings.getPaymentMethod(by: item.paymentMethodId ?? "")?.name ?? "Cash"
             let note = (item.note ?? "").replacingOccurrences(of: ",", with: " ")
             

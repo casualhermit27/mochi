@@ -36,6 +36,15 @@ struct ExportDataView: View {
         
         return items.filter { $0.timestamp >= start && $0.timestamp <= end }
     }
+
+    private var summaryTotalValue: String {
+        let currencyCodes = Set(filteredItems.map { settings.normalizedCurrencyCode(for: $0) })
+        guard currencyCodes.count == 1, let code = currencyCodes.first else {
+            return "MIXED"
+        }
+        let total = filteredItems.reduce(0) { $0 + $1.amount }
+        return "\(settings.currencySymbol(for: code))\(String(format: "%.0f", total))"
+    }
     
     var body: some View {
         ZStack {
@@ -86,7 +95,7 @@ struct ExportDataView: View {
                             HStack(spacing: 12) {
                                 SummaryPill(
                                     label: "Total", 
-                                    value: "\(settings.currencySymbol)\(String(format: "%.0f", filteredItems.reduce(0) { $0 + $1.amount }))",
+                                    value: summaryTotalValue,
                                     dynamicText: dynamicText
                                 )
                                 SummaryPill(
@@ -363,7 +372,7 @@ struct ExportDataView: View {
                         xOffset = margin
                         let dateStr = rowDateFormatter.string(from: item.timestamp)
                         let noteStr = String((item.note ?? "-").prefix(30))
-                        let amountStr = "\(settings.currencySymbol)\(String(format: "%.2f", item.amount))"
+                        let amountStr = "\(settings.currencySymbol(for: item.currencyCode))\(String(format: "%.2f", item.amount))"
                         let methodStr = settings.getPaymentMethod(by: item.paymentMethodId)?.name ?? "Cash"
                         
                         let values = [dateStr, noteStr, amountStr, methodStr]
@@ -395,9 +404,15 @@ struct ExportDataView: View {
                         context.cgContext.strokePath()
                         yOffset += 10
                         
-                        let totalAmount = itemsToExport.reduce(0) { $0 + $1.amount }
                         let totalLabelStr = "TOTAL:"
-                        let totalValueStr = "\(settings.currencySymbol)\(String(format: "%.2f", totalAmount))"
+                        let currencyCodes = Set(itemsToExport.map { settings.normalizedCurrencyCode(for: $0) })
+                        let totalValueStr: String
+                        if currencyCodes.count == 1, let code = currencyCodes.first {
+                            let totalAmount = itemsToExport.reduce(0) { $0 + $1.amount }
+                            totalValueStr = "\(settings.currencySymbol(for: code))\(String(format: "%.2f", totalAmount))"
+                        } else {
+                            totalValueStr = "MIXED"
+                        }
                         
                         let totalFont = UIFont.systemFont(ofSize: 12, weight: .bold)
                         

@@ -182,7 +182,9 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                 // Daily
                 let settings = SettingsManager.shared
                 let currentRitual = settings.getRitualDay(for: today)
-                let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitual }
+                let todayItems = items.filter {
+                    settings.getRitualDay(for: $0.timestamp) == currentRitual && settings.isItemInActiveCurrency($0)
+                }
                 dailyTotal = todayItems.reduce(0) { $0 + $1.amount }
                 
                 // Weekly: Ritual-aware sliding 7-day window
@@ -191,7 +193,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                 
                 let weekItems = items.filter { item in
                     let ritual = settings.getRitualDay(for: item.timestamp)
-                    return ritual >= startOfWindow && ritual <= currentRitualDay
+                    return ritual >= startOfWindow && ritual <= currentRitualDay && settings.isItemInActiveCurrency(item)
                 }
                 let weekTotal = weekItems.reduce(0) { $0 + $1.amount }
                 weeklyAvg = weekTotal
@@ -278,10 +280,14 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                         // Real Daily Data (Ritual Aware)
                         let settings = SettingsManager.shared
                         let currentRitual = settings.getRitualDay(for: today)
-                        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitual }
+                        let todayItems = items.filter {
+                            settings.getRitualDay(for: $0.timestamp) == currentRitual && settings.isItemInActiveCurrency($0)
+                        }
                         let todayTotal = todayItems.reduce(0) { $0 + $1.amount }
                         
-                        let grouped = Dictionary(grouping: items) { calendar.startOfDay(for: $0.timestamp) }
+                        let grouped = Dictionary(grouping: items.filter { settings.isItemInActiveCurrency($0) }) {
+                            calendar.startOfDay(for: $0.timestamp)
+                        }
                         let recentDays = grouped.keys.sorted(by: >).prefix(30)
                         let totalSpend = recentDays.reduce(0) { sum, date in sum + (grouped[date]?.reduce(0) { $0 + $1.amount } ?? 0) }
                         let average = recentDays.isEmpty ? 0 : totalSpend / Double(recentDays.count)
@@ -314,7 +320,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                         
                         let weekItems = items.filter { item in
                             let ritual = settings.getRitualDay(for: item.timestamp)
-                            return ritual >= startOfWindow && ritual <= currentRitualDay
+                            return ritual >= startOfWindow && ritual <= currentRitualDay && settings.isItemInActiveCurrency(item)
                         }
                         
                         let weekTotal = weekItems.reduce(0) { $0 + $1.amount }
@@ -355,7 +361,9 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
         let settings = SettingsManager.shared
         let currentRitualDay = settings.getRitualDay(for: Date())
         
-        let todayItems = items.filter { settings.getRitualDay(for: $0.timestamp) == currentRitualDay }
+        let todayItems = items.filter {
+            settings.getRitualDay(for: $0.timestamp) == currentRitualDay && settings.isItemInActiveCurrency($0)
+        }
         return todayItems.reduce(0) { $0 + $1.amount }
     }
 }

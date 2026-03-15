@@ -99,6 +99,7 @@ struct HistoryView: View {
         let timestamp: Date
         let note: String?
         let paymentMethodId: String?
+        let currencyCode: String?
     }
     
     var hasDateFilter: Bool {
@@ -181,7 +182,9 @@ struct HistoryView: View {
                     ForEach(sortedDates, id: \.self) { date in
                         // Calculate Day Total
                         let dayItems = groupedItems[date] ?? []
-                        let dayTotal = dayItems.reduce(0) { $0 + $1.amount }
+                        let dayTotal = dayItems
+                            .filter { settings.isItemInActiveCurrency($0) }
+                            .reduce(0) { $0 + $1.amount }
                          // If searching, always expand
                         let isExpanded = (!searchText.isEmpty || hasDateFilter) ? true : expandedDays.contains(date)
                         
@@ -228,9 +231,9 @@ struct HistoryView: View {
                                     // Unlocked entries
                                     ForEach(dayItems) { item in
                                         if let deletionDate = pendingDeletions[item.persistentModelID] {
-                                             UndoRowView(
+                                            UndoRowView(
                                                 deletionDate: deletionDate,
-                                                amountText: "\(settings.currencySymbol)\(item.amount.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", item.amount) : String(format: "%.2f", item.amount))",
+                                                amountText: "\(settings.currencySymbol(for: item.currencyCode))\(item.amount.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", item.amount) : String(format: "%.2f", item.amount))",
                                                 isNightTime: isNightTime,
                                                 onUndo: { undoPendingDeletion(item) },
                                                 onDeleteImmediately: { confirmDeletion(item) }
@@ -275,7 +278,7 @@ struct HistoryView: View {
                                                     }
                                                     Spacer()
                                                     HStack(spacing: 2) {
-                                                        Text(settings.currencySymbol)
+                                                        Text(settings.currencySymbol(for: item.currencyCode))
                                                             .font(.system(size: 14))
                                                             .foregroundColor(dynamicSecondary)
                                                         Text(item.amount.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", item.amount) : String(format: "%.2f", item.amount))
@@ -896,13 +899,15 @@ struct HistoryView: View {
         withAnimation {
             if pendingDeletions[item.persistentModelID] != nil {
                 _ = pendingDeletions.removeValue(forKey: item.persistentModelID)
-                sessionDeletedAmount += item.amount
+                if settings.isItemInActiveCurrency(item) {
+                    sessionDeletedAmount += item.amount
+                }
                 
                 // Update Widget specifically for deletion
                 WidgetDataManager.shared.updateWidgetData(
                     todayTotal: 0, // Does not matter, MainView will update totals
                     yesterdayTotal: 0,
-                    lastTransaction: -item.amount,
+                    lastTransaction: settings.isItemInActiveCurrency(item) ? -item.amount : nil,
                     lastTransactionNote: "",
                     currencySymbol: settings.currencySymbol,
                     colorTheme: settings.colorTheme,
@@ -925,7 +930,9 @@ struct HistoryView: View {
                 // Time to delete
                 if let item = items.first(where: { $0.persistentModelID == id }) {
                     withAnimation {
-                        sessionDeletedAmount += item.amount
+                        if settings.isItemInActiveCurrency(item) {
+                            sessionDeletedAmount += item.amount
+                        }
                         modelContext.delete(item)
                         pendingDeletions.removeValue(forKey: id)
                     }
@@ -1005,9 +1012,12 @@ struct HistoryView: View {
                     amount: item.amount, 
                     timestamp: item.timestamp, 
                     note: item.note,
-                    paymentMethodId: item.paymentMethodId
+                    paymentMethodId: item.paymentMethodId,
+                    currencyCode: item.currencyCode
                 ))
-                amountDeleted += item.amount
+                if settings.isItemInActiveCurrency(item) {
+                    amountDeleted += item.amount
+                }
                 modelContext.delete(item)
             }
         }
@@ -1059,13 +1069,16 @@ struct HistoryView: View {
         // Restore items
         for snapshot in undoSnapshots {
             let newItem = Item(
-                timestamp: snapshot.timestamp, 
-                amount: snapshot.amount, 
+                timestamp: snapshot.timestamp,
+                amount: snapshot.amount,
                 note: snapshot.note,
-                paymentMethodId: snapshot.paymentMethodId
+                paymentMethodId: snapshot.paymentMethodId,
+                currencyCode: snapshot.currencyCode
             )
             modelContext.insert(newItem)
-            sessionDeletedAmount -= snapshot.amount
+            if snapshot.currencyCode == nil || snapshot.currencyCode == settings.activeCurrencyCode {
+                sessionDeletedAmount -= snapshot.amount
+            }
         }
         
         undoSnapshots.removeAll()
