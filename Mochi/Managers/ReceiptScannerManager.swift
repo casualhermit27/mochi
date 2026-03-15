@@ -80,7 +80,7 @@ final class ReceiptScannerManager {
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = false
             request.recognitionLanguages = ["en-US", "en-GB", "ar-AE"]
-            request.minimumTextHeight = 0.015
+            request.minimumTextHeight = 0.01
             
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
             do {

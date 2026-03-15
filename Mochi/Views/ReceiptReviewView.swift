@@ -25,6 +25,7 @@ struct ReceiptReviewView: View {
     @State private var useReceiptDate: Bool = true
     @State private var editableAmountText: String = ""
     @State private var manualDate: Date = Date()
+    @State private var showCurrencyMismatchAlert: Bool = false
 
     // MARK: Computed
 
@@ -122,6 +123,17 @@ struct ReceiptReviewView: View {
             }
             manualDate = result.receiptDate ?? Date()
             useReceiptDate = result.receiptDate != nil && result.isDateReliable
+        }
+        .alert("Currency Mismatch", isPresented: $showCurrencyMismatchAlert) {
+            Button("Switch to \(result.currencyCode ?? "")") {
+                if let code = result.currencyCode, !code.isEmpty {
+                    settings.customCurrencyCode = code
+                }
+                confirmAndSave(forceSave: true)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This receipt appears to be in \(result.currencyCode ?? "a different currency"), but your app currency is \(settings.activeCurrencyCode). Switch currency to save?")
         }
     }
 
@@ -253,8 +265,16 @@ struct ReceiptReviewView: View {
 
     // MARK: - Save
 
-    private func confirmAndSave() {
+    private func confirmAndSave(forceSave: Bool = false) {
         HapticManager.shared.rigidImpact()
+
+        if !forceSave,
+           let detected = result.currencyCode,
+           !detected.isEmpty,
+           detected != settings.activeCurrencyCode {
+            showCurrencyMismatchAlert = true
+            return
+        }
 
         let note = editableNote.isEmpty ? nil : editableNote
         onSave(finalAmount, note, finalDate, result.currencyCode)
