@@ -449,11 +449,13 @@ struct MainContentView: View {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
                 .presentationCornerRadius(32)
+                .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(32)
+                .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $changelogManager.showChangelog) {
             ChangelogView(
@@ -465,6 +467,7 @@ struct MainContentView: View {
             .presentationCornerRadius(32)
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled(true) // Force them to hit 'Continue' to acknowledge
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
 
         .sheet(isPresented: $showPaymentMethods) {
@@ -510,12 +513,14 @@ struct MainContentView: View {
                 processScannedImage(image)
             }
             .ignoresSafeArea()
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showPhotoLibrary) {
             PhotoLibraryPickerView { image in
                 showPhotoLibrary = false
                 processScannedImage(image)
             }
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showReceiptReview) {
             if let result = receiptScanResult {

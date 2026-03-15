@@ -3,10 +3,22 @@ import SwiftUI
 struct SpeedDialSettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     
     // Dynamic Colors
     let dynamicText: Color
     let dynamicBackground: Color
+    
+    // Theme Logic
+    var isNightTime: Bool {
+        if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
+        if settings.themeMode == "light" { return false }
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
+    }
     
     // Edit State
     @State private var editingKey: Int?
@@ -200,9 +212,13 @@ struct SpeedDialSettingsView: View {
                     Spacer()
                 }
                 .background(dynamicBackground)
-                .navigationTitle("Edit Preset")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Edit Preset")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundColor(dynamicText)
+                    }
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { showEditSheet = false }
                             .foregroundColor(dynamicText)
@@ -224,6 +240,7 @@ struct SpeedDialSettingsView: View {
             }
             .presentationDetents([.medium, .large])
             .presentationCornerRadius(32)
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
     }
     

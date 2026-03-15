@@ -15,6 +15,26 @@ struct PaymentMethodSelector: View {
     @FocusState private var isNoteFocused: Bool
     @Namespace private var animation
     
+    @State private var localMethods: [PaymentMethod]
+
+    init(isVisible: Binding<Bool>, note: Binding<String>, dynamicText: Color, dynamicBackground: Color, accentColor: Color, onAddRequest: @escaping () -> Void, onSave: (() -> Void)? = nil) {
+        self._isVisible = isVisible
+        self._note = note
+        self.dynamicText = dynamicText
+        self.dynamicBackground = dynamicBackground
+        self.accentColor = accentColor
+        self.onAddRequest = onAddRequest
+        self.onSave = onSave
+        
+        let manager = SettingsManager.shared
+        var methods = manager.paymentMethods
+        if let idx = methods.firstIndex(where: { $0.id.uuidString == manager.selectedPaymentMethodId }) {
+            let selected = methods.remove(at: idx)
+            methods.insert(selected, at: 0)
+        }
+        self._localMethods = State(initialValue: methods)
+    }
+    
     var body: some View {
         GeometryReader { outerProxy in
             let screenWidth = outerProxy.size.width
@@ -45,7 +65,7 @@ struct PaymentMethodSelector: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 0) {
                             // Existing Payment Methods
-                            ForEach(settings.paymentMethods) { method in
+                            ForEach(localMethods) { method in
                                 PaymentMethodDialItem(
                                     method: method,
                                     dynamicText: dynamicText,
@@ -100,6 +120,14 @@ struct PaymentMethodSelector: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activePush)
                     .onAppear {
                         scrollProxy.scrollTo(settings.selectedPaymentMethodId, anchor: .center)
+                    }
+                    .onChange(of: settings.paymentMethods) { _, newMethods in
+                        var methods = newMethods
+                        if let idx = methods.firstIndex(where: { $0.id.uuidString == settings.selectedPaymentMethodId }) {
+                            let selected = methods.remove(at: idx)
+                            methods.insert(selected, at: 0)
+                        }
+                        localMethods = methods
                     }
                     .mask(
                         HStack(spacing: 0) {
