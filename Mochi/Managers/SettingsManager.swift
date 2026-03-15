@@ -70,6 +70,7 @@ class SettingsManager: ObservableObject {
         let amount: Double
         let label: String
         let icon: String // Emoji
+        var paymentMethodId: String?
     }
     
     var speedDialPresets: [Int: SpeedDialPreset] {

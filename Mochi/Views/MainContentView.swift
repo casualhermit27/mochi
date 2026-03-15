@@ -24,6 +24,7 @@ struct MainContentView: View {
     @State private var addedAmount: Double = 0
     @State private var isNegativeDelta = false
     @State private var sessionDeletedAmount: Double = 0
+    @StateObject private var changelogManager = ChangelogManager.shared
     
     // Input State
     @State private var isInputActive = false
@@ -452,11 +453,25 @@ struct MainContentView: View {
             HistoryView(sessionDeletedAmount: $sessionDeletedAmount, isNightTime: isNightTime)
                 .presentationBackground(.ultraThinMaterial)
                 .presentationCornerRadius(32)
+                .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(32)
+                .preferredColorScheme(isNightTime ? .dark : .light)
+        }
+        .sheet(isPresented: $changelogManager.showChangelog) {
+            ChangelogView(
+                dynamicText: dynamicText,
+                dynamicBackground: dynamicBackground,
+                accentColor: accentColor
+            )
+            .presentationDetents([.fraction(0.85)]) // Large enough but clearly a sheet
+            .presentationCornerRadius(32)
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled(true) // Force them to hit 'Continue' to acknowledge
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
 
         .sheet(isPresented: $showPaymentMethods) {
@@ -502,12 +517,14 @@ struct MainContentView: View {
                 processScannedImage(image)
             }
             .ignoresSafeArea()
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showPhotoLibrary) {
             PhotoLibraryPickerView { image in
                 showPhotoLibrary = false
                 processScannedImage(image)
             }
+            .preferredColorScheme(isNightTime ? .dark : .light)
         }
         .sheet(isPresented: $showReceiptReview) {
             if let result = receiptScanResult {
@@ -573,6 +590,8 @@ struct MainContentView: View {
             updateWidgetData()
             // Ensure notifications are up to date
             notificationManager.scheduleNotifications()
+            // Check for changelog
+            changelogManager.checkVersion()
         }
         .onChange(of: items.count) { oldValue, newValue in
             // Update widget when items change
@@ -694,13 +713,13 @@ struct MainContentView: View {
         // Instant Add
         // Just use the label, no icon in history (User request)
         let note = preset.label
-        instantAdd(amount: preset.amount, note: note)
+        instantAdd(amount: preset.amount, note: note, paymentMethodId: preset.paymentMethodId)
     }
     
-    private func instantAdd(amount: Double, note: String) {
+    private func instantAdd(amount: Double, note: String, paymentMethodId: String? = nil) {
         HapticManager.shared.rigidImpact()
         
-        let methodId = settings.selectedPaymentMethod.id.uuidString
+        let methodId = paymentMethodId ?? settings.selectedPaymentMethod.id.uuidString
         let newItem = Item(
             timestamp: Date(),
             amount: amount,

@@ -809,6 +809,15 @@ struct HistoryView: View {
                     dismiss()
                 }
             }
+            .onDisappear {
+                for (id, _) in pendingDeletions {
+                    if let item = items.first(where: { $0.persistentModelID == id }) {
+                        sessionDeletedAmount += item.amount
+                        modelContext.delete(item)
+                    }
+                }
+                pendingDeletions.removeAll()
+            }
         }
     }
     
