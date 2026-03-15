@@ -59,7 +59,9 @@ final class ReceiptScannerManager {
                 
                 for obs in observations {
                     if let topCandidate = obs.topCandidates(1).first {
-                        let text = topCandidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let text = self.normalizeOCRNumberSpacing(
+                            topCandidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
                         if !text.isEmpty {
                             rawTokens.append((text: text, box: obs.boundingBox))
                         }
@@ -78,6 +80,7 @@ final class ReceiptScannerManager {
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = false
             request.recognitionLanguages = ["en-US", "en-GB", "ar-AE"]
+            request.minimumTextHeight = 0.015
             
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
             do {
@@ -108,7 +111,7 @@ final class ReceiptScannerManager {
 
         if let contrast = processed.applyingFilter(
             "CIColorControls",
-            parameters: ["inputSaturation": 0.0, "inputContrast": 1.25, "inputBrightness": 0.0]
+            parameters: ["inputSaturation": 0.0, "inputContrast": 1.35, "inputBrightness": 0.0]
         ) as CIImage? {
             processed = contrast
         }
@@ -147,9 +150,10 @@ final class ReceiptScannerManager {
                 
                 let overlap = max(0, min(tokenMaxY, rowMaxY) - max(tokenMinY, rowMinY))
                 let tokenHeight = token.box.height
+                let rowHeight = row.map { $0.box.height }.max() ?? tokenHeight
                 
                 // Relaxed vertical tolerance to account for wrinkled or skewed receipts
-                if overlap > tokenHeight * 0.3 || abs(token.box.midY - (rowMinY + rowMaxY)/2) < tokenHeight * 0.8 {
+                if overlap > tokenHeight * 0.25 || abs(token.box.midY - (rowMinY + rowMaxY)/2) < max(tokenHeight, rowHeight) * 0.65 {
                     groupedRows[idx].append(token)
                     found = true
                     break
@@ -259,9 +263,7 @@ final class ReceiptScannerManager {
 
     private func parseGrandTotal(tokens: [(text: String, box: CGRect)]) -> Double? {
         let skipKeywords = [
-            "cash", "change", "tendered", "credit", "credit note", "card", "visa", "mastercard",
-            "subtotal", "sub total", "tax", "vat", "gst", "discount", "savings", "tip", "gratuity",
-            "service", "round", "rounding"
+            "cash", "change", "tendered", "card", "credit", "tip", "gratuity", "rounding", "discount"
         ]
 
         // Normalize tokens for matching
@@ -275,7 +277,7 @@ final class ReceiptScannerManager {
             normalizedTokens.filter { token in
                 let overlap = max(0, min(token.box.maxY, box.maxY) - max(token.box.minY, box.minY))
                 let height = max(token.box.height, box.height)
-                return overlap > height * 0.2 || abs(token.box.midY - box.midY) < height * 0.6
+                return overlap > height * 0.2 || abs(token.box.midY - box.midY) < height * 0.8
             }
         }
 
@@ -285,13 +287,20 @@ final class ReceiptScannerManager {
             return skipKeywords.contains(where: { rowText.contains($0) })
         }
 
-        func findKeywordBox(isGrand: Bool) -> CGRect? {
-            var best: CGRect? = nil
+        func findKeywordBoxes(isGrand: Bool) -> [CGRect] {
+            let grandArabic = ["الإجمالي", "الإجمالي الكلي", "المجموع الكلي"]
+            let totalArabic = ["المجموع", "الإجمالي"]
+
+            var boxes: [CGRect] = []
             for token in normalizedTokens {
                 if isGrand {
+                    if grandArabic.contains(where: { token.lower.contains($0) }) {
+                        boxes.append(token.box)
+                        continue
+                    }
                     if token.compact.contains("grandtotal") {
-                        best = token.box
-                        break
+                        boxes.append(token.box)
+                        continue
                     }
                     if token.compact.contains("grand") {
                         for other in normalizedTokens {
@@ -299,34 +308,46 @@ final class ReceiptScannerManager {
                             let height = max(token.box.height, other.box.height)
                             if overlap > height * 0.2 || abs(token.box.midY - other.box.midY) < height * 0.6 {
                                 if other.compact == "total" || other.compact.contains("total") {
-                                    let union = token.box.union(other.box)
-                                    if best == nil || union.minY > best!.minY {
-                                        best = union
-                                    }
+                                    boxes.append(token.box.union(other.box))
                                 }
                             }
                         }
                     }
                 } else {
+                    if totalArabic.contains(where: { token.lower.contains($0) }) {
+                        boxes.append(token.box)
+                        continue
+                    }
                     if token.compact.contains("subtotal") || token.compact.contains("subtot") {
                         continue
                     }
                     if token.compact == "total" || token.compact.contains("total") {
-                        best = token.box
-                        break
-                    }
-                    // Handle "invoice total", "total inclusive", etc.
-                    if token.compact.contains("total") {
-                        best = token.box
-                        break
+                        boxes.append(token.box)
+                        continue
                     }
                 }
             }
-            return best
+            return boxes
+        }
+
+        func normalizeDigits(_ text: String) -> String {
+            var result = ""
+            for scalar in text.unicodeScalars {
+                switch scalar.value {
+                case 0x0660...0x0669: // Arabic-Indic digits
+                    result.append(String(UnicodeScalar(scalar.value - 0x0660 + 0x0030)!))
+                case 0x06F0...0x06F9: // Eastern Arabic-Indic digits
+                    result.append(String(UnicodeScalar(scalar.value - 0x06F0 + 0x0030)!))
+                default:
+                    result.append(Character(scalar))
+                }
+            }
+            return result
         }
 
         func normalizedAmount(from text: String) -> Double? {
-            let cleaned = text
+            let cleaned = normalizeDigits(text)
+                .replacingOccurrences(of: #"\b(\d{1,5})\s*\.\s*(\d{2})\b"#, with: "$1.$2", options: .regularExpression)
                 .replacingOccurrences(of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#, with: ".", options: .regularExpression)
                 .replacingOccurrences(of: #"[₹$€£¥]|Rs\.?|AED|USD|INR|SAR|QAR|KWD|BHD|OMR|\s+"#, with: "", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: ",", with: ".")
@@ -341,29 +362,38 @@ final class ReceiptScannerManager {
             return nil
         }
 
+        func horizontalGap(_ left: CGRect, _ right: CGRect) -> CGFloat {
+            return max(0, right.minX - left.maxX)
+        }
+
         func candidateAmounts(toRightOf keywordBox: CGRect) -> [(value: Double, box: CGRect)] {
             var candidates: [(Double, CGRect)] = []
-            for token in normalizedTokens {
-                guard token.box.minX > keywordBox.maxX + 0.01 else { continue }
+            let rowTokens = normalizedTokens.filter { token in
+                guard token.box.minX > keywordBox.maxX + 0.005 else { return false }
                 let overlap = max(0, min(token.box.maxY, keywordBox.maxY) - max(token.box.minY, keywordBox.minY))
                 let height = max(token.box.height, keywordBox.height)
-                guard overlap > height * 0.2 || abs(token.box.midY - keywordBox.midY) < height * 0.6 else { continue }
+                return overlap > height * 0.15 || abs(token.box.midY - keywordBox.midY) < height * 0.9
+            }.sorted(by: { $0.box.minX < $1.box.minX })
 
-                // Try direct parse
+            for (idx, token) in rowTokens.enumerated() {
                 if let value = normalizedAmount(from: token.text) {
                     candidates.append((value, token.box))
-                    continue
                 }
 
-                // Try merge with immediate right token for space-decimals (e.g., "3" "26")
-                let rightTokens = normalizedTokens.filter {
-                    $0.box.minX > token.box.maxX &&
-                    (abs($0.box.midY - token.box.midY) < max($0.box.height, token.box.height) * 0.6)
-                }
-                if let nearestRight = rightTokens.min(by: { $0.box.minX < $1.box.minX }) {
-                    let merged = "\(token.text) \(nearestRight.text)"
-                    if let value = normalizedAmount(from: merged) {
-                        let mergedBox = token.box.union(nearestRight.box)
+                // Try merging with up to two following tokens on the same row
+                var mergedText = token.text
+                var mergedBox = token.box
+                for j in (idx + 1)..<min(idx + 3, rowTokens.count) {
+                    let next = rowTokens[j]
+                    if abs(next.box.midY - token.box.midY) > max(next.box.height, token.box.height) * 0.8 {
+                        break
+                    }
+                    if horizontalGap(mergedBox, next.box) > max(mergedBox.width, next.box.width) * 0.8 {
+                        break
+                    }
+                    mergedText += " \(next.text)"
+                    mergedBox = mergedBox.union(next.box)
+                    if let value = normalizedAmount(from: mergedText) {
                         candidates.append((value, mergedBox))
                     }
                 }
@@ -378,22 +408,47 @@ final class ReceiptScannerManager {
             return best.value
         }
 
-        if let grandBox = findKeywordBox(isGrand: true) {
-            return pickClosestRightAmount(for: grandBox)
+        let grandBoxes = findKeywordBoxes(isGrand: true).sorted(by: { $0.minY < $1.minY })
+        for box in grandBoxes {
+            if let value = pickClosestRightAmount(for: box) {
+                return value
+            }
         }
 
-        if let totalBox = findKeywordBox(isGrand: false) {
-            return pickClosestRightAmount(for: totalBox)
+        let totalBoxes = findKeywordBoxes(isGrand: false).sorted(by: { $0.minY < $1.minY })
+        for box in totalBoxes {
+            if let value = pickClosestRightAmount(for: box) {
+                return value
+            }
         }
 
-        return nil
+        let allAmounts = tokens.flatMap { extractAllCurrencies(from: $0.text) }
+        let plausible = allAmounts.filter { $0 >= 0.1 && $0 <= 100000 }
+        return plausible.max()
+    }
+
+    private func normalizeOCRNumberSpacing(_ text: String) -> String {
+        var normalized = text
+        normalized = normalized.replacingOccurrences(
+            of: #"\b(\d{1,5})\s*\.\s*(\d{2})\b"#,
+            with: "$1.$2",
+            options: .regularExpression
+        )
+        normalized = normalized.replacingOccurrences(
+            of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#,
+            with: ".",
+            options: .regularExpression
+        )
+        return normalized
     }
 
     // MARK: - Currency Parsing
 
     private func extractAllCurrencies(from text: String) -> [Double] {
         // Fix OCR spacing issues. Convert "3 26" to "3.26"
-        let normalized = text.replacingOccurrences(of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#, with: ".", options: .regularExpression)
+        let normalized = text
+            .replacingOccurrences(of: #"\b(\d{1,5})\s*\.\s*(\d{2})\b"#, with: "$1.$2", options: .regularExpression)
+            .replacingOccurrences(of: #"(?<=\b\d{1,5})\s(?=\d{2}\b)"#, with: ".", options: .regularExpression)
 
         let pattern = #"\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})\b"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
@@ -456,14 +511,17 @@ final class ReceiptScannerManager {
 
     private func parseMerchantName(lines: [String]) -> String? {
         let limit = min(3, lines.count)
+        let blacklist = [
+            "tax", "invoice", "receipt", "vat", "gst", "bill", "order",
+            "payment", "transaction", "table"
+        ]
         for i in 0..<limit {
             let text = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.count > 3 && text.count < 40 {
-                let lower = text.lowercased()
-                if !lower.contains("tax") && !lower.contains("invoice") && !lower.contains("receipt") {
-                    return text
-                }
-            }
+            guard text.count >= 4 && text.count <= 40 else { continue }
+            let lower = text.lowercased()
+            guard !blacklist.contains(where: { lower.contains($0) }) else { continue }
+            let hasAlpha = text.range(of: #"[A-Za-z]"#, options: .regularExpression) != nil
+            if hasAlpha { return text }
         }
         return nil
     }
