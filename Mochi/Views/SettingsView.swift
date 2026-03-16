@@ -169,7 +169,12 @@ struct SettingsView: View {
                             
                             // 5. About (Separated Rhythm)
                             NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
-                                MenuRow(icon: "info.circle.fill", title: "About", value: "v1.0.0", dynamicText: dynamicText)
+                                MenuRow(
+                                    icon: "info.circle.fill",
+                                    title: "About",
+                                    value: "v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1")",
+                                    dynamicText: dynamicText
+                                )
                             }
                             .accessibilityIdentifier("about_row")
                             .padding(.top, 16) // Extra rhythm separation
@@ -187,7 +192,7 @@ struct SettingsView: View {
                                 Text("Mochi")
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundColor(dynamicText.opacity(0.15))
-                                Text("v1.0.0")
+                                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1")")
                                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                                     .foregroundColor(dynamicText.opacity(0.1))
                             }
@@ -292,9 +297,7 @@ struct AppearanceSettingsView: View {
                 HStack {
                     Button(action: {
                         HapticManager.shared.softSquish()
-                        if !isRestoring {
-                            dismiss()
-                        }
+                        dismiss()
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .bold)) // Slightly bolder
@@ -1038,7 +1041,7 @@ struct AboutSettingsView: View {
                                         .font(.system(size: 16, weight: .medium, design: .rounded))
                                         .foregroundColor(dynamicText)
                                     Spacer()
-                                    Text("1.0.0")
+                                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1")
                                         .font(.system(size: 14, weight: .medium, design: .monospaced))
                                         .foregroundColor(dynamicText.opacity(0.4))
                                 }
