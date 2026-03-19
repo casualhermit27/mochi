@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import UniformTypeIdentifiers
 
 // MARK: - History View
 
@@ -90,6 +91,10 @@ struct HistoryView: View {
     @State private var undoTimer: Timer?
     @State private var undoSecondsRemaining = 7
     
+    // Edit Date
+    @State private var editingDateItem: Item? = nil
+    @State private var editDateValue: Date = Date()
+    
     // Drag-to-Select State
     @State private var isDragging = false
     @State private var dragSelectMode: Bool? = nil 
@@ -173,6 +178,13 @@ struct HistoryView: View {
     var sortedDates: [Date] {
         groupedItems.keys.sorted(by: >)
     }
+
+    private func dayTotal(for date: Date) -> Double {
+        let dayItems = groupedItems[date] ?? []
+        return dayItems
+            .filter { settings.isItemInActiveCurrency($0) }
+            .reduce(0) { $0 + $1.amount }
+    }
     
     var body: some View {
         NavigationStack {
@@ -182,9 +194,7 @@ struct HistoryView: View {
                     ForEach(sortedDates, id: \.self) { date in
                         // Calculate Day Total
                         let dayItems = groupedItems[date] ?? []
-                        let dayTotal = dayItems
-                            .filter { settings.isItemInActiveCurrency($0) }
-                            .reduce(0) { $0 + $1.amount }
+                        let dayTotal = dayTotal(for: date)
                          // If searching, always expand
                         let isExpanded = (!searchText.isEmpty || hasDateFilter) ? true : expandedDays.contains(date)
                         
@@ -332,9 +342,24 @@ struct HistoryView: View {
                                                     }
                                                 : nil
                                             )
+                                            .onDrag {
+                                                guard !isSelectionMode else { return NSItemProvider() }
+                                                HapticManager.shared.selection()
+                                                let idString = String(describing: item.persistentModelID)
+                                                return NSItemProvider(object: idString as NSString)
+                                            }
                                             .listRowBackground(Color.clear)
                                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                                 if !isSelectionMode {
+                                                    Button {
+                                                        editingDateItem = item
+                                                        editDateValue = item.timestamp
+                                                        HapticManager.shared.selection()
+                                                    } label: {
+                                                        Label("Edit Date", systemImage: "calendar")
+                                                    }
+                                                    .tint(accentColor)
+                                                    
                                                     Button(role: .destructive) {
                                                         startPendingDeletion(item)
                                                     } label: {
@@ -412,6 +437,14 @@ struct HistoryView: View {
                                     }
                                 }
                                 .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                                .onDrop(of: [.text], delegate: HistoryDropDelegate(
+                                    targetDate: date,
+                                    items: items,
+                                    onMove: { item, target in
+                                        moveItem(item, to: target)
+                                    }
+                                ))
                             }
                         }
                     }
@@ -431,6 +464,22 @@ struct HistoryView: View {
                 .scrollContentBackground(.hidden)
                 .background(dynamicBackground)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelectionMode)
+                .sheet(item: $editingDateItem) { item in
+                    EditDateSheet(
+                        dynamicText: dynamicText,
+                        dynamicBackground: dynamicBackground,
+                        accentColor: accentColor,
+                        date: $editDateValue,
+                        onCancel: { editingDateItem = nil },
+                        onSave: {
+                            moveItem(item, to: editDateValue)
+                            editingDateItem = nil
+                        }
+                    )
+                    .presentationDetents([.height(420)])
+                    .presentationCornerRadius(24)
+                    .presentationBackground(dynamicBackground)
+                }
                 .onReceive(timer) { _ in
                     checkPendingDeletions()
                 }
@@ -1094,6 +1143,88 @@ struct HistoryView: View {
         withAnimation { showUndoToast = false }
     }
     
+    private func moveItem(_ item: Item, to day: Date) {
+        let calendar = Calendar.current
+        let time = calendar.dateComponents([.hour, .minute, .second], from: item.timestamp)
+        let target = calendar.date(
+            bySettingHour: time.hour ?? 12,
+            minute: time.minute ?? 0,
+            second: time.second ?? 0,
+            of: day
+        ) ?? day
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            item.timestamp = target
+        }
+        HapticManager.shared.lightImpact()
+    }
+    
+}
+
+struct HistoryDropDelegate: DropDelegate {
+    let targetDate: Date
+    let items: [Item]
+    let onMove: (Item, Date) -> Void
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let itemProvider = info.itemProviders(for: [.text]).first else { return false }
+        itemProvider.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
+            guard let data = data as? Data,
+                  let idString = String(data: data, encoding: .utf8) else { return }
+            if let item = items.first(where: { String(describing: $0.persistentModelID) == idString }) {
+                DispatchQueue.main.async {
+                    onMove(item, targetDate)
+                }
+            }
+        }
+        return true
+    }
+}
+
+struct EditDateSheet: View {
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let accentColor: Color
+    @Binding var date: Date
+    let onCancel: () -> Void
+    let onSave: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Edit Date")
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundColor(dynamicText)
+                Spacer()
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(dynamicText.opacity(0.6))
+                        .frame(width: 30, height: 30)
+                        .background(dynamicText.opacity(0.08))
+                        .clipShape(Circle())
+                }
+            }
+            
+            DatePicker("Select date", selection: $date, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .tint(accentColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Button(action: onSave) {
+                Text("Save")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundColor(dynamicBackground)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(SquishyButtonStyle(isDoneButton: true))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 28)
+    }
 }
 
 // MARK: - Undo Row Component
