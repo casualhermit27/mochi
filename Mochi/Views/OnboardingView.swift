@@ -77,7 +77,7 @@ struct OnboardingView: View {
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                     } else if currentPage == 2 {
                         paywallPage
-                            .frame(maxHeight: UIScreen.main.bounds.height * 0.75)
+                            .frame(maxHeight: UIWindowScene.screenBounds.height * 0.75)
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                     } else if currentPage == 3 {
                         cloudSyncPage

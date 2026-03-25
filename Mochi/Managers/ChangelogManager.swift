@@ -27,10 +27,9 @@ class ChangelogManager: ObservableObject {
     
     // The current changelog to show for the latest version
     let currentChangelog: [ChangelogItem] = [
-        ChangelogItem(icon: "bolt.fill", title: "Speed Dial Payment Types", description: "You can now assign specific payment methods to your speed dial presets! Long press a number in Settings > Speed Dial to edit."),
-        ChangelogItem(icon: "paintpalette.fill", title: "Purple Theme", description: "A new purple theme is now available in Themes."),
-        ChangelogItem(icon: "doc.viewfinder", title: "Receipt Scanning", description: "Effortlessly add transactions by scanning your receipts directly from the Keypad."),
-        ChangelogItem(icon: "creditcard", title: "Payment Method Icons", description: "View exactly how you paid with visual indicators in your History view.")
+        ChangelogItem(icon: "square.grid.2x2.fill", title: "Lavender Widget", description: "The purple theme now extends to your home screen widget. Set your theme to Lavender and your widget matches."),
+        ChangelogItem(icon: "checkmark.seal.fill", title: "Free Trial Fixed", description: "New users now correctly see the 3-day free trial offer. Everything is unlocked during your trial — no strings attached."),
+        ChangelogItem(icon: "wrench.and.screwdriver.fill", title: "Bug Fixes & Improvements", description: "Squashed several under-the-hood bugs and improved stability across the app.")
     ]
     
     func checkVersion() {

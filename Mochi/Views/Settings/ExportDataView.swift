@@ -3,6 +3,10 @@ import SwiftData
 import UIKit
 import LinkPresentation
 
+enum ExportType: Equatable, Sendable {
+    case csv, pdf
+}
+
 struct ExportDataView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
@@ -24,9 +28,7 @@ struct ExportDataView: View {
     @State private var endDate = Date()
     @State private var useAllTime = true
     
-    enum ExportType {
-        case csv, pdf
-    }
+
     
     var filteredItems: [Item] {
         if useAllTime { return items }
@@ -241,10 +243,11 @@ struct ExportDataView: View {
         
         // Dispatch to background for heavy generation
         let exportItems = filteredItems
-        
+        let isCSV = type == .csv
+
         DispatchQueue.global(qos: .userInitiated).async {
             let url: URL?
-            if type == .csv {
+            if isCSV {
                 url = ExportManager.shared.generateCSV(items: exportItems, settings: settings)
             } else {
                 url = generatePDF(itemsToExport: exportItems)

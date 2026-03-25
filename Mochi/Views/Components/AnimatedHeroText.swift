@@ -68,7 +68,7 @@ struct AnimatedHeroView: View {
                 textFragment = Text("\n")
             }
             
-            combined = combined + textFragment
+            combined = Text("\(combined)\(textFragment)")
         }
         
         return combined
@@ -120,7 +120,7 @@ struct AnimatedHeroView: View {
             .opacity(isVisible ? 1 : 0)
         
         let renderer = ImageRenderer(content: view)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = UITraitCollection.current.displayScale
         if let uiImage = renderer.uiImage {
             return Image(uiImage: uiImage)
         }
@@ -138,7 +138,7 @@ struct AnimatedHeroView: View {
             .opacity(isVisible ? 1 : 0)
         
         let renderer = ImageRenderer(content: view)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = UITraitCollection.current.displayScale
         if let uiImage = renderer.uiImage {
             return Image(uiImage: uiImage)
         }
@@ -155,7 +155,7 @@ struct AnimatedHeroView: View {
             .opacity(isVisible ? 1 : 0)
         
         let renderer = ImageRenderer(content: view)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = UITraitCollection.current.displayScale
         if let uiImage = renderer.uiImage {
             return Image(uiImage: uiImage)
         }

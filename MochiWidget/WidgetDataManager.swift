@@ -213,6 +213,12 @@ class WidgetDataManager {
                     text: isDark ? Color(red: 0.92, green: 0.88, blue: 0.82) : Color(red: 0.35, green: 0.28, blue: 0.22),
                     accent: Color(red: 0.60, green: 0.45, blue: 0.35)
                 )
+            case "purple":
+                return WidgetTheme(
+                    background: isDark ? (darkBg ?? Color(red: 0.11, green: 0.09, blue: 0.18)) : Color(red: 0.96, green: 0.94, blue: 1.0),
+                    text: isDark ? Color(red: 0.88, green: 0.82, blue: 1.0) : Color(red: 0.32, green: 0.20, blue: 0.52),
+                    accent: Color(red: 0.60, green: 0.40, blue: 0.90)
+                )
             default:
                 return WidgetTheme(
                     background: isDark ? (darkBg ?? Color(red: 0.11, green: 0.11, blue: 0.12)) : Color(red: 0.98, green: 0.97, blue: 0.95),

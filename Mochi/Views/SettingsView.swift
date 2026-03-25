@@ -208,7 +208,11 @@ struct SettingsView: View {
             PaywallView()
         }
         .sheet(isPresented: $subscription.showCustomerCenter) {
-            SubscriptionCustomerCenterView()
+            if subscription.isLifetime {
+                LifetimeOwnerView()
+            } else {
+                SubscriptionCustomerCenterView()
+            }
         }
         .fullScreenCover(item: $notificationManager.activeReflection) { data in
             ReflectionView(
@@ -1016,8 +1020,8 @@ struct AboutSettingsView: View {
                                     Spacer()
                                     Button(action: {
                                         isRestoring = true
-                                        Task { 
-                                            await subscription.restorePurchases()
+                                        Task {
+                                            _ = await subscription.restorePurchases()
                                             isRestoring = false
                                         }
                                     }) {

@@ -105,7 +105,7 @@ struct KeypadButton: View {
                     // Tap Logic (Only if not backspace, as backspace handles on changed)
                     if !isBackspace {
                          // Check if it was a short tap (pressStartTime is non-nil means timer didn't fire long press yet)
-                        if let start = pressStartTime {
+                        if pressStartTime != nil {
                              onTap(text)
                         }
                     }

@@ -1,4 +1,16 @@
 import SwiftUI
+import UIKit
+
+// MARK: - Screen Helpers (replaces deprecated UIScreen.main)
+extension UIWindowScene {
+    static var current: UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+    }
+    static var screenBounds: CGRect { current?.screen.bounds ?? CGRect(x: 0, y: 0, width: 390, height: 844) }
+}
 
 // MARK: - Theme & Extensions
 extension Color {

@@ -38,7 +38,7 @@
     "_developerTeamID" : "847R6X96S2",
     "_disableDialogs" : false,
     "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 792491635.21025705,
+    "_lastSynchronizedDate" : 795683225.15246403,
     "_locale" : "en_US",
     "_renewalBillingIssuesEnabled" : false,
     "_storefront" : "USA",
@@ -66,7 +66,12 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6759031940",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "7998104C",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
           "localizations" : [
             {
               "description" : "Unlock all Mochi+ features with a monthly subscription.",
@@ -94,7 +99,12 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6759032215",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "646D6114",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
           "localizations" : [
             {
               "description" : "Unlock all Mochi+ features with a yearly subscription.",

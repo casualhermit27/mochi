@@ -23,12 +23,17 @@ final class SubscriptionManager: ObservableObject {
     /// Current RevenueCat offering for the paywall
     @Published var currentOffering: Offering?
     
-    /// Intro pricing eligibility flags mapped by Apple Product ID
-    @Published var introEligibilities: [String: IntroEligibility] = [:]
-    
+    /// Whether the user has ever used a free trial (derived from CustomerInfo, no extra network call)
+    @Published var hasUsedTrial: Bool = false
+
     /// Whether the user has full access (paid subscription or Apple Free Trial)
     var isFullAccess: Bool {
         return isPro
+    }
+
+    /// Whether the user has a lifetime purchase (no expiry, no subscription management needed)
+    var isLifetime: Bool {
+        return activeProductId?.contains("lifetime") == true
     }
     
     /// Whether the user is on a free trial (subset of isPro)
@@ -62,10 +67,15 @@ final class SubscriptionManager: ObservableObject {
         delegate.manager = self
         Purchases.shared.delegate = delegate
         
-        // Initial status check
+        // Fetch offerings immediately — no dependency on user identity
+        Task { await fetchOfferings() }
+
+        // Login with iCloud identity then refresh subscription status
         Task {
+            if let iCloudID = Self.iCloudUserID() {
+                _ = try? await Purchases.shared.logIn(iCloudID)
+            }
             await checkSubscriptionStatus()
-            await fetchOfferings()
         }
     }
     
@@ -109,6 +119,9 @@ final class SubscriptionManager: ObservableObject {
             self.isOnTrial = false
             self.trialDaysRemaining = 0
         }
+
+        // Derive trial eligibility from entitlements history — no extra network call needed
+        self.hasUsedTrial = customerInfo.entitlements.all.values.contains { $0.periodType == .trial }
     }
     
     // MARK: - Fetch Offerings
@@ -120,12 +133,6 @@ final class SubscriptionManager: ObservableObject {
         do {
             let offerings = try await Purchases.shared.offerings()
             self.currentOffering = offerings.current
-            
-            if let current = offerings.current {
-                let productIds = current.availablePackages.map { $0.storeProduct.productIdentifier }
-                let eligibilities = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: productIds)
-                self.introEligibilities = eligibilities
-            }
             
             var debug = "Offerings Source: RevenueCat\n"
             if let current = offerings.current {
@@ -230,6 +237,17 @@ final class SubscriptionManager: ObservableObject {
         return "Free"
     }
     
+    // MARK: - iCloud Identity
+
+    /// Returns a stable string ID tied to the user's iCloud account.
+    /// Persists across reinstalls as long as the same iCloud account is used.
+    private static func iCloudUserID() -> String? {
+        guard let token = FileManager.default.ubiquityIdentityToken,
+              let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true)
+        else { return nil }
+        return data.base64EncodedString()
+    }
+
     /// Detailed status for About section
     var detailedStatus: String {
         if !isPro { return "Free Version" }

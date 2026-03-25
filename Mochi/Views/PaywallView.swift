@@ -256,10 +256,8 @@ struct PaywallView: View {
                     }
                     .padding(.horizontal, 24)
                     
-                    if let pkg = selectedPackage, !subscription.isPro {
-                        let eligibility = subscription.introEligibilities[pkg.storeProduct.productIdentifier]?.status
-                        let isEligible = (eligibility == .eligible || eligibility == .unknown)
-                        if !isEligible {
+                    if !subscription.isPro {
+                        if subscription.hasUsedTrial {
                             Text("TRIAL COMPLETED")
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                                 .tracking(1)
@@ -389,10 +387,7 @@ struct PaywallView: View {
         
         guard let pkg = selectedPackage else { return "Select a Plan" }
         
-        let eligibility = subscription.introEligibilities[pkg.storeProduct.productIdentifier]?.status
-        let isEligible = (eligibility == .eligible || eligibility == .unknown)
-        
-        if isEligible, let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
+        if !subscription.hasUsedTrial, let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
             return "Start \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Free Trial"
         } else {
             return "Get Mochi +"

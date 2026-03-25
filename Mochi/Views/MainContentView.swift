@@ -364,6 +364,10 @@ struct MainContentView: View {
                         Spacer()
                         Button(action: {
                             guard !isScanning, !isLaunchingReceiptFlow, !showReceiptSourcePicker else { return }
+                            if isTrialOver {
+                                subscription.showPaywall = true
+                                return
+                            }
                             isLaunchingReceiptFlow = true
                             HapticManager.shared.softSquish()
                             withAnimation(.spring(response: 0.22, dampingFraction: 0.58)) {
@@ -399,7 +403,7 @@ struct MainContentView: View {
                         .buttonStyle(SquishyButtonStyle())
                         .disabled(isScanning || isLaunchingReceiptFlow || showCamera || showPhotoLibrary)
                         .accessibilityLabel("Scan receipt")
-                        .padding(.trailing, UIScreen.main.bounds.width / 2 - 134)
+                        .padding(.trailing, UIWindowScene.screenBounds.width / 2 - 134)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -820,7 +824,7 @@ struct MainContentView: View {
         let count = items.count + 1 // +1 because the query updates asynchronously usually, or we just count this one
         if [5, 20, 50].contains(count) {
              if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                 SKStoreReviewController.requestReview(in: scene)
+                 AppStore.requestReview(in: scene)
              }
         }
     }
@@ -1126,7 +1130,7 @@ struct TrialCompletedOverlay: View {
                             isRestoring = true
                             HapticManager.shared.softSquish()
                             Task {
-                                await SubscriptionManager.shared.restorePurchases()
+                                _ = await SubscriptionManager.shared.restorePurchases()
                                 isRestoring = false
                             }
                         }) {

@@ -53,7 +53,11 @@ struct MochiApp: App {
                             NotificationManager.shared.setModelContainer(sharedModelContainer)
                         }
                         .sheet(isPresented: $subscriptionManager.showCustomerCenter) {
-                            SubscriptionCustomerCenterView()
+                            if subscriptionManager.isLifetime {
+                                LifetimeOwnerView()
+                            } else {
+                                SubscriptionCustomerCenterView()
+                            }
                         }
                         .sheet(isPresented: $subscriptionManager.showPaywall) {
                             PaywallView()
@@ -134,9 +138,48 @@ import RevenueCatUI
 
 struct SubscriptionCustomerCenterView: View {
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         CustomerCenterView()
+    }
+}
+
+// MARK: - Lifetime Owner View
+struct LifetimeOwnerView: View {
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "infinity")
+                .font(.system(size: 52, weight: .light))
+                .foregroundColor(.mochiGreen)
+
+            VStack(spacing: 8) {
+                Text("You own it forever.")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                Text("Thanks for being a lifetime member.\nNo expiry. No renewals. Ever.")
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Spacer()
+
+            Button(action: { dismiss() }) {
+                Text("Done")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.mochiGreen)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 40)
+        }
+        .padding()
     }
 }
 
