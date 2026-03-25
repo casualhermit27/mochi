@@ -12,6 +12,7 @@ class SettingsManager: ObservableObject {
     // Let's use a String: "system", "auto", "light", "dark", "amoled".
     
     @AppStorage("themeMode") var themeMode: String = "system"
+    @AppStorage("appLanguage") var appLanguage: String = "system" // "system", "en-AU", "en-GB", "en-CA"
     @AppStorage("colorTheme") var colorTheme: String = "default" // default, pink, blue, green, butterscotch, brown, purple
     @AppStorage("customCurrencyCode") var customCurrencyCode: String = "" // Stores ISO code (e.g. "USD", "KRW")
     @AppStorage("widgetMatchTheme") var widgetMatchTheme: Bool = true // Should widget match app theme?
@@ -369,7 +370,9 @@ class SettingsManager: ObservableObject {
         }
         
         for code in codes {
-            let name = Locale.autoupdatingCurrent.localizedString(forCurrencyCode: code) ?? code
+            let defaultLanguage = UserDefaults.standard.string(forKey: "appLanguage") ?? "system"
+            let targetIdentifier = defaultLanguage == "system" ? Locale.autoupdatingCurrent.identifier : defaultLanguage
+            let name = Locale(identifier: targetIdentifier).localizedString(forCurrencyCode: code) ?? code
             let symbol = bestSymbols[code] ?? code
             result.append(Currency(code: code, symbol: symbol, name: name))
         }
@@ -410,7 +413,7 @@ class CloudSyncManager: NSObject {
     static let shared = CloudSyncManager()
     
     private let syncedKeys = [
-        "themeMode", "colorTheme", "customCurrencyCode", "widgetMatchTheme",
+        "themeMode", "appLanguage", "colorTheme", "customCurrencyCode", "widgetMatchTheme",
         "dayStartHour", "dayStartMinute", 
         "dailyNotificationEnabled", "notificationTime", "weeklyNotificationEnabled", "weeklyNotificationWeekday",
         "hapticsEnabled", "soundsEnabled",

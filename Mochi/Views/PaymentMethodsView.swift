@@ -181,7 +181,7 @@ struct PaymentMethodCard: View {
                 
                 // Name & Type
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(method.name)
+                    Text(LocalizedStringKey(method.name))
                         .font(.system(size: 16, weight: .semibold, design: .monospaced))
                         .foregroundColor(dynamicText)
                     

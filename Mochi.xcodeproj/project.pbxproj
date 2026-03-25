@@ -213,8 +213,6 @@
 				E54BA9152F4366AC00802A05 /* MochiTests */,
 			);
 			name = MochiTests;
-			packageProductDependencies = (
-			);
 			productName = MochiTests;
 			productReference = E54BA9142F4366AC00802A05 /* MochiTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -235,8 +233,6 @@
 				E590D2102F1BF9A200ACC0CD /* MochiWidget */,
 			);
 			name = MochiWidgetExtension;
-			packageProductDependencies = (
-			);
 			productName = MochiWidgetExtension;
 			productReference = E590D20D2F1BF9A200ACC0CD /* MochiWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -269,6 +265,14 @@
 			knownRegions = (
 				en,
 				Base,
+				ar,
+				es,
+				ja,
+				"zh-Hans",
+				ko,
+				"en-AU",
+				"en-GB",
+				"en-CA",
 			);
 			mainGroup = C316FA7A2F1BEC7400B7E257;
 			minimizedProjectReferenceProxies = 1;
@@ -483,7 +487,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 13;
-				DEVELOPMENT_TEAM = 847R6X96S2;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Mochi/Info.plist;
@@ -525,7 +529,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 13;
-				DEVELOPMENT_TEAM = 847R6X96S2;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Mochi/Info.plist;

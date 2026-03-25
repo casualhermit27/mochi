@@ -116,7 +116,7 @@ struct MainContentView: View {
         }
     }
     
-    var greeting: String {
+    var greeting: LocalizedStringKey {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
         case 5..<12: return "Good morning."
@@ -997,11 +997,11 @@ struct ReceiptSourcePickerSheet: View {
                     .frame(width: 34, height: 34)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundColor(dynamicText)
 
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(dynamicText.opacity(0.5))
                 }
@@ -1197,11 +1197,11 @@ struct TrialFeatureRow: View {
             }
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundColor(textColor)
                 
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundColor(textColor.opacity(0.5))
             }

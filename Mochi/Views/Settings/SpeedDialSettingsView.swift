@@ -286,7 +286,7 @@ struct SpeedDialKeyView: View {
                 }
             }
             
-            Text(preset?.label ?? "Empty")
+            Text(LocalizedStringKey(preset?.label ?? "Empty"))
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundColor(dynamicText.opacity(preset != nil ? 0.8 : 0.3))
                 .lineLimit(1)

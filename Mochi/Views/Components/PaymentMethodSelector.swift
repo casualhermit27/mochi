@@ -279,7 +279,7 @@ struct PaymentMethodDialItem: View {
                     .font(.system(size: 20, weight: isSelected ? .bold : .regular)) 
                     .foregroundColor(isSelected ? method.color : dynamicText)
                 
-                Text(method.name)
+                Text(LocalizedStringKey(method.name))
                     .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .rounded))
                     .foregroundColor(isSelected ? method.color : dynamicText)
                     .lineLimit(1)
@@ -308,7 +308,7 @@ struct CompactPaymentBadge: View {
         HStack(spacing: 4) {
             Image(systemName: method.type == .cash ? "banknote" : "creditcard")
                 .font(.system(size: 9, weight: .bold))
-            Text(method.name)
+            Text(LocalizedStringKey(method.name))
                 .font(.system(size: 10, weight: .bold, design: .rounded))
         }
         .foregroundColor(method.color)

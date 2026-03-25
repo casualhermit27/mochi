@@ -45,7 +45,7 @@ struct AnimatedHeroView: View {
             switch chunk {
             case .text(let string, let isHighlight):
                 let color = isHighlight ? textPrimary : textSecondary
-                textFragment = Text(string)
+                textFragment = Text(LocalizedStringKey(string))
                     .foregroundColor(isVisible ? color : clearColor)
                 
             case .icon(let name, let color):
@@ -110,7 +110,7 @@ struct AnimatedHeroView: View {
     
     @MainActor
     private func renderPill(title: String, color: Color, isVisible: Bool) -> Image? {
-        let view = Text(title)
+        let view = Text(LocalizedStringKey(title))
             .font(.system(size: 14, weight: .heavy, design: .monospaced))
             .foregroundColor(.white)
             .padding(.horizontal, 10)

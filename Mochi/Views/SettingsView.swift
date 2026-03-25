@@ -105,6 +105,13 @@ struct SettingsView: View {
                             .accessibilityIdentifier("appearance_row")
                             .padding(.horizontal, 20)
                             
+                            // 1.5 Language
+                            NavigationLink(destination: LanguageSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
+                                MenuRow(icon: "globe", title: "Language", value: languageDisplayString(for: settings.appLanguage), dynamicText: dynamicText)
+                            }
+                            .accessibilityIdentifier("language_row")
+                            .padding(.horizontal, 20)
+                            
                             // 2. Logging
                             NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
@@ -232,6 +239,20 @@ struct SettingsView: View {
         }
         .preferredColorScheme(isNightTime ? .dark : .light)
     }
+    
+    private func languageDisplayString(for code: String) -> String {
+        switch code {
+        case "en-AU": return "English (AU)"
+        case "en-GB": return "English (UK)"
+        case "en-CA": return "English (CA)"
+        case "ar": return "العربية"
+        case "es": return "Español"
+        case "ja": return "日本語"
+        case "zh-Hans": return "简体中文"
+        case "ko": return "한국어"
+        default: return "System"
+        }
+    }
 }
 
 // MARK: - Level 1 Components
@@ -253,14 +274,14 @@ struct MenuRow: View {
                     .foregroundColor(dynamicText.opacity(0.7))
             }
             
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 17, weight: .medium, design: .rounded))
                 .foregroundColor(dynamicText)
             
             Spacer()
             
             HStack(spacing: 6) {
-                Text(value)
+                Text(LocalizedStringKey(value))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundColor(dynamicText.opacity(0.4))
                 Image(systemName: "chevron.right")
@@ -572,6 +593,140 @@ struct LoggingSettingsView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+// MARK: - Language Settings
+
+struct LanguageSettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    let dynamicText: Color
+    let dynamicBackground: Color
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                            )
+                    }
+                    Spacer()
+                    Text("Language")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        SettingsSection(icon: "globe", title: "LANGUAGE", textColor: dynamicText) {
+                            VStack(spacing: 2) {
+                                LanguageRow(title: "System", code: "system", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("system")
+                                }
+                                LanguageRow(title: "English (Australia)", code: "en-AU", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("en-AU")
+                                }
+                                LanguageRow(title: "English (U.K)", code: "en-GB", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("en-GB")
+                                }
+                                LanguageRow(title: "English (Canada)", code: "en-CA", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("en-CA")
+                                }
+                                LanguageRow(title: "العربية", code: "ar", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("ar")
+                                }
+                                LanguageRow(title: "Español", code: "es", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("es")
+                                }
+                                LanguageRow(title: "日本語", code: "ja", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("ja")
+                                }
+                                LanguageRow(title: "简体中文", code: "zh-Hans", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("zh-Hans")
+                                }
+                                LanguageRow(title: "한국어", code: "ko", current: settings.appLanguage, color: dynamicText) {
+                                    updateLanguage("ko")
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+    
+    private func updateLanguage(_ code: String) {
+        HapticManager.shared.softSquish()
+        
+        // Critical: Synchronously blast the override before the View re-evaluates
+        if code == "system" {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        }
+        UserDefaults.standard.synchronize()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation {
+                settings.appLanguage = code
+            }
+        }
+    }
+}
+
+struct LanguageRow: View {
+    let title: String
+    let code: String
+    let current: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(LocalizedStringKey(title))
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundColor(color)
+                
+                Spacer()
+                
+                if current == code {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Color.mochiGreen)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1078,9 +1233,9 @@ struct MembershipCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .opacity(0.6)
             }
@@ -1125,7 +1280,7 @@ struct SettingsSection<Content: View>: View {
                 Image(systemName: icon)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(textColor.opacity(0.4))
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(textColor.opacity(0.4))
                     .tracking(1.2)
@@ -1161,10 +1316,10 @@ struct ThemeModeRow: View {
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.system(size: 14, weight: isSelected ? .semibold : .medium, design: .monospaced))
                         .foregroundColor(isSelected ? color : color.opacity(0.6))
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundColor(color.opacity(0.35))
                 }
@@ -1205,7 +1360,7 @@ struct ColorThemeButton: View {
                     Image(systemName: theme.icon).font(.system(size: 16, weight: .medium)).foregroundColor(theme.accent)
                     if isSelected { Circle().stroke(dynamicText, lineWidth: 2).frame(width: 54, height: 54) }
                 }
-                Text(theme.name).font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded)).foregroundColor(isSelected ? dynamicText : dynamicText.opacity(0.5))
+                Text(LocalizedStringKey(theme.name)).font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded)).foregroundColor(isSelected ? dynamicText : dynamicText.opacity(0.5))
             }
         }
         .buttonStyle(.plain)
@@ -1536,7 +1691,7 @@ struct DebugInfoRow: View {
                 .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundColor(dynamicText)
             Spacer()
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
                 .foregroundColor(dynamicText.opacity(0.45))
         }

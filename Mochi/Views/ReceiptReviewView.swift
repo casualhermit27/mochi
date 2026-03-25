@@ -171,7 +171,7 @@ struct ReceiptReviewView: View {
 
     private var amountSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("Amount")
+            sectionLabel(String(localized: "AMOUNT"))
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(displayCurrencySymbol)
@@ -197,7 +197,7 @@ struct ReceiptReviewView: View {
 
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("Bill Type/Store Name")
+            sectionLabel(String(localized: "BILL TYPE/STORE NAME"))
 
             HStack(spacing: 10) {
                 Image(systemName: "pencil")

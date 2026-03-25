@@ -112,11 +112,11 @@ struct PaywallView: View {
                                 .foregroundColor(dynamicAccent)
                         }
                         
-                        Text(headerTitle)
+                        Text(LocalizedStringKey(headerTitle))
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(dynamicText)
                         
-                        Text(headerSubtitle)
+                        Text(LocalizedStringKey(headerSubtitle))
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(dynamicText.opacity(0.5))
                             .multilineTextAlignment(.center)
@@ -134,7 +134,7 @@ struct PaywallView: View {
                     
                     // Widget Preview
                     VStack(spacing: 12) {
-                        Text("Beautiful on your Home Screen")
+                        Text(LocalizedStringKey("Beautiful on your Home Screen"))
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(dynamicText.opacity(0.4))
                         
@@ -174,10 +174,10 @@ struct PaywallView: View {
                                     }
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(subscription.isPro ? "Mochi+ Membership Active" : "Mochi+ Trial Active")
+                                        Text(LocalizedStringKey(subscription.isPro ? "Mochi+ Membership Active" : "Mochi+ Trial Active"))
                                             .font(.system(size: 16, weight: .bold, design: .rounded))
                                             .foregroundColor(dynamicText)
-                                        Text("All premium features are unlocked")
+                                        Text(LocalizedStringKey("All premium features are unlocked"))
                                             .font(.system(size: 13, weight: .medium, design: .rounded))
                                             .foregroundColor(dynamicText.opacity(0.5))
                                     }
@@ -281,7 +281,7 @@ struct PaywallView: View {
                             if isLoading {
                                 MochiSpinner(size: 28)
                             } else {
-                                Text(buttonLabel)
+                                buttonLabelView
                                     .font(.system(size: 17, weight: .bold, design: .monospaced))
                             }
                         }
@@ -299,7 +299,7 @@ struct PaywallView: View {
                             if isLoading {
                                 MochiSpinner(size: 16)
                             } else {
-                                Text("Restore Purchases")
+                                Text(LocalizedStringKey("Restore Purchases"))
                             }
                         }
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -381,16 +381,21 @@ struct PaywallView: View {
         return "Everything you need for perfect tracking."
     }
     
-    private var buttonLabel: String {
-        if subscription.isPro { return isEmbedded ? "Active · Continue" : "Manage Subscription" }
-        if subscription.isFullAccess && !isEmbedded { return "Got it" }
-        
-        guard let pkg = selectedPackage else { return "Select a Plan" }
-        
-        if !subscription.hasUsedTrial, let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
-            return "Start \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Free Trial"
+    @ViewBuilder
+    private var buttonLabelView: some View {
+        if subscription.isPro {
+            Text(LocalizedStringKey(isEmbedded ? "Active · Continue" : "Manage Subscription"))
+        } else if subscription.isFullAccess && !isEmbedded {
+            Text(LocalizedStringKey("Got it"))
+        } else if let pkg = selectedPackage {
+            if !subscription.hasUsedTrial, let intro = pkg.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
+                let unitStr = NSLocalizedString(introDurationUnit(intro.subscriptionPeriod.unit), comment: "")
+                Text("Start \(intro.subscriptionPeriod.value)-\(unitStr) Free Trial")
+            } else {
+                Text(LocalizedStringKey("Get Mochi +"))
+            }
         } else {
-            return "Get Mochi +"
+            Text(LocalizedStringKey("Select a Plan"))
         }
     }
     
@@ -467,10 +472,10 @@ struct FeatureRow: View {
                 .frame(width: 32)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(text)
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundColor(text.opacity(0.5))
             }
@@ -499,12 +504,13 @@ struct PackageCard: View {
         Button(action: action) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(packageName)
+                    Text(LocalizedStringKey(packageName))
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
                         .foregroundColor(isSelected ? (isNightTime ? .black : .white) : textColor)
                     
                     if let intro = package.storeProduct.introductoryDiscount, intro.paymentMode == .freeTrial {
-                        Text("Best Value · \(intro.subscriptionPeriod.value)-\(introDurationUnit(intro.subscriptionPeriod.unit)) Trial")
+                        let unitStr = NSLocalizedString(introDurationUnit(intro.subscriptionPeriod.unit), comment: "")
+                        Text("Best Value · \(intro.subscriptionPeriod.value)-\(unitStr) Trial")
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(isSelected ? (isNightTime ? .black.opacity(0.6) : .white.opacity(0.7)) : accentColor)
                     } else if package.packageType == .annual {

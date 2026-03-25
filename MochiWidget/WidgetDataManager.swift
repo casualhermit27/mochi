@@ -26,6 +26,7 @@ class WidgetDataManager {
     private let isProKey = "widget_is_pro"
     private let dayStartHourKey = "widget_day_start_hour"
     private let dayStartMinuteKey = "widget_day_start_minute"
+    private let appLanguageKey = "widget_app_language"
     
     // MARK: - Save Data (Called from main app)
     
@@ -59,6 +60,9 @@ class WidgetDataManager {
         sharedDefaults?.set(isPro, forKey: isProKey)
         sharedDefaults?.set(dayStartHour, forKey: dayStartHourKey)
         sharedDefaults?.set(dayStartMinute, forKey: dayStartMinuteKey)
+        if let appLanguage = UserDefaults.standard.string(forKey: "appLanguage") {
+            sharedDefaults?.set(appLanguage, forKey: appLanguageKey)
+        }
     }
     
     // MARK: - Read Data (Called from widget)
@@ -99,6 +103,10 @@ class WidgetDataManager {
     
     var isPro: Bool {
         sharedDefaults?.bool(forKey: isProKey) ?? false
+    }
+
+    var appLanguage: String {
+        sharedDefaults?.string(forKey: appLanguageKey) ?? "system"
     }
     
     // MARK: - Stale Data Logic

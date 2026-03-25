@@ -24,11 +24,12 @@ struct WidgetPreviewView: View {
             
             // Top Left: Date (Month + Day)
             HStack(spacing: 4) {
-                Text(date.formatted(.dateTime.month()).uppercased())
+                Text(date, format: .dateTime.month())
+                    .textCase(.uppercase)
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundColor((isDark ? theme.textDark : theme.text).opacity(0.6))
                 
-                Text(date.formatted(.dateTime.day()))
+                Text(date, format: .dateTime.day())
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundColor(isDark ? theme.textDark : theme.text)
             }
@@ -37,7 +38,7 @@ struct WidgetPreviewView: View {
 
             // Top Right: Last Transaction
             VStack(alignment: .trailing, spacing: 2) {
-                Text(lastTransactionNote)
+                Text(LocalizedStringKey(lastTransactionNote))
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor((isDark ? theme.textDark : theme.text).opacity(0.5))
                     .lineLimit(1)

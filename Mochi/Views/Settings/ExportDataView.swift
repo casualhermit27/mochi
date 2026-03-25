@@ -460,7 +460,7 @@ struct SummaryPill: View {
             Text(label.uppercased())
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundColor(dynamicText.opacity(0.3))
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.system(size: 15, weight: .bold, design: .monospaced))
                 .foregroundColor(dynamicText.opacity(0.8))
         }
@@ -485,7 +485,7 @@ struct RangeOptionButton: View {
             HapticManager.shared.lightImpact()
             action()
         }) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(isSelected ? .white : dynamicText.opacity(0.5))
                 .frame(maxWidth: .infinity)
@@ -522,10 +522,10 @@ struct ExportRow: View {
                     }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(textColor)
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(textColor.opacity(0.5))
                 }

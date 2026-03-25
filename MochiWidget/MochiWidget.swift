@@ -89,6 +89,11 @@ struct MochiWidgetEntryView : View {
     @Environment(\.widgetFamily) var family
 
     // Theme Colors
+    var widgetLocale: Locale {
+        let lang = WidgetDataManager.shared.appLanguage
+        return lang == "system" ? Locale.autoupdatingCurrent : Locale(identifier: lang)
+    }
+
     var theme: WidgetDataManager.WidgetTheme {
         WidgetDataManager.WidgetTheme.forTheme(
             entry.colorTheme,
@@ -109,7 +114,7 @@ struct MochiWidgetEntryView : View {
                     .clipShape(Capsule())
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("TODAY")
+                    Text(String(localized: "TODAY", locale: widgetLocale))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(.secondary)
                     
@@ -138,11 +143,11 @@ struct MochiWidgetEntryView : View {
                 
                 // Top Left: Date (Month + Day)
                 HStack(spacing: 4) {
-                    Text(entry.date.formatted(.dateTime.month()).uppercased())
+                    Text(entry.date.formatted(.dateTime.month().locale(widgetLocale)).uppercased())
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.text.opacity(0.6))
                     
-                    Text(entry.date.formatted(.dateTime.day()))
+                    Text(entry.date.formatted(.dateTime.day().locale(widgetLocale)))
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.text)
                 }
@@ -152,7 +157,7 @@ struct MochiWidgetEntryView : View {
                 // Top Right: Last Transaction
                 VStack(alignment: .trailing, spacing: 2) {
                     if entry.lastTransaction != 0 {
-                        Text(entry.lastTransactionNote.isEmpty ? "LAST" : entry.lastTransactionNote.uppercased())
+                        Text(entry.lastTransactionNote.isEmpty ? String(localized: "LAST", locale: widgetLocale) : entry.lastTransactionNote.uppercased())
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.text.opacity(0.5))
                             .lineLimit(1)
@@ -176,7 +181,7 @@ struct MochiWidgetEntryView : View {
                 
                 // Bottom Left: Today Total
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("TODAY")
+                    Text(String(localized: "TODAY", locale: widgetLocale))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .tracking(1.0)
                         .foregroundColor(theme.text.opacity(0.5))
@@ -270,6 +275,8 @@ struct MochiWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in
             MochiWidgetEntryView(entry: entry)
+                .environment(\.locale, WidgetDataManager.shared.appLanguage == "system" ? Locale.autoupdatingCurrent : Locale(identifier: WidgetDataManager.shared.appLanguage))
+                .environment(\.layoutDirection, ["ar", "he", "fa", "ur"].contains(String((WidgetDataManager.shared.appLanguage == "system" ? Locale.autoupdatingCurrent.identifier : WidgetDataManager.shared.appLanguage).prefix(2))) ? .rightToLeft : .leftToRight)
         }
         .configurationDisplayName("Daily Spend")
         .description("Keep track of your daily expenses.")

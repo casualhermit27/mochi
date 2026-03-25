@@ -438,7 +438,7 @@ struct OnboardingView: View {
                 currentPage += 1
             }
         }) {
-            Text(text)
+            Text(LocalizedStringKey(text))
                 .font(.system(size: 16, weight: .semibold, design: .monospaced))
                 .foregroundColor(textPrimary)
                 .frame(height: 56)

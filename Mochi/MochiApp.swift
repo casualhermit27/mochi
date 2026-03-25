@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 import SwiftData
 
 @main
@@ -125,6 +128,27 @@ struct MochiApp: App {
                             withAnimation { settings.hideSyncToast() }
                         }
                     }
+                }
+                .environment(\.locale, {
+                    if settings.appLanguage == "system" {
+                        let sysLang = UserDefaults.standard.stringArray(forKey: "AppleLanguages")?.first ?? Locale.autoupdatingCurrent.identifier
+                        return Locale(identifier: sysLang)
+                    } else {
+                        return Locale(identifier: settings.appLanguage)
+                    }
+                }())
+                .environment(\.layoutDirection, {
+                    let code = settings.appLanguage == "system" ? (UserDefaults.standard.stringArray(forKey: "AppleLanguages")?.first ?? "en") : settings.appLanguage
+                    return ["ar", "he", "fa", "ur"].contains(String(code.prefix(2))) ? .rightToLeft : .leftToRight
+                }())
+                .id(settings.appLanguage)
+                .onChange(of: settings.appLanguage) { _, newValue in
+                    let langCode = newValue == "system" ? Locale.autoupdatingCurrent.identifier : newValue
+                    UserDefaults.standard.set([langCode], forKey: "AppleLanguages")
+                    UserDefaults(suiteName: "group.com.mochi.spent")?.set(newValue, forKey: "widget_app_language")
+                    #if canImport(WidgetKit)
+                    WidgetCenter.shared.reloadAllTimelines()
+                    #endif
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: settings.showSyncToast)
 
