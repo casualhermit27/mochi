@@ -112,6 +112,13 @@ struct SettingsView: View {
                             .accessibilityIdentifier("language_row")
                             .padding(.horizontal, 20)
                             
+                            // 1.6 Security
+                            NavigationLink(destination: SecuritySettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor)) {
+                                MenuRow(icon: "faceid", title: "Security", value: settings.biometricLockEnabled ? "On" : "Off", dynamicText: dynamicText)
+                            }
+                            .accessibilityIdentifier("security_row")
+                            .padding(.horizontal, 20)
+                            
                             // 2. Logging
                             NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
                                 MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
@@ -252,6 +259,73 @@ struct SettingsView: View {
         case "ko": return "한국어"
         default: return "System"
         }
+    }
+}
+
+// MARK: - Security Settings View
+
+struct SecuritySettingsView: View {
+    @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var biometricManager = BiometricManager.shared
+    
+    let dynamicText: Color
+    let dynamicBackground: Color
+    let accentColor: Color
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        ZStack {
+            dynamicBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom Header
+                HStack {
+                    Button(action: {
+                        HapticManager.shared.softSquish()
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(dynamicText)
+                            .frame(width: 40, height: 40)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(dynamicText.opacity(0.1), lineWidth: 1)
+                            )
+                    }
+                    Spacer()
+                    Text("Security")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(dynamicText)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        SettingsSection(icon: "lock.fill", title: "APP LOCK", textColor: dynamicText) {
+                            Toggle(isOn: $settings.biometricLockEnabled) {
+                                Text("Require Face ID / Touch ID")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                    .foregroundColor(dynamicText)
+                            }
+                            .tint(accentColor)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(dynamicText.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

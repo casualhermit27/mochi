@@ -16,8 +16,10 @@ struct HistoryView: View {
     
     @State private var taggingItem: Item? = nil
     @State private var tagText: String = ""
+    @State private var tagCategoryOverride: String = ""
     @FocusState private var isTagFocused: Bool
     @State private var showRestoreToast = false
+    @State private var showStats = false
     
     // Undo State
     @State private var pendingDeletions: [PersistentIdentifier: Date] = [:]
@@ -145,7 +147,9 @@ struct HistoryView: View {
                     methodMatch = method.name.localizedLowercase.contains(query)
                 }
                 
-                if !(noteMatch || amountMatch || methodMatch) {
+                let categoryMatch = item.category?.localizedLowercase.contains(query) ?? false
+                
+                if !(noteMatch || amountMatch || methodMatch || categoryMatch) {
                     matches = false
                 }
             }
@@ -177,6 +181,25 @@ struct HistoryView: View {
     
     var sortedDates: [Date] {
         groupedItems.keys.sorted(by: >)
+    }
+    
+    // Exact mapping logic from Insights page for color consistency
+    var categoryColorMap: [String: Color] {
+        var totals: [String: Double] = [:]
+        let validItems = items.filter { settings.isItemInActiveCurrency($0) }
+        for item in validItems {
+            let cat = item.category ?? "Other 📦"
+            totals[cat, default: 0.0] += item.amount
+        }
+        
+        let sortedCategories = totals.keys.sorted { (totals[$0] ?? 0) > (totals[$1] ?? 0) }
+        let palette = settings.currentPastelTheme.chartPalette
+        
+        var map: [String: Color] = [:]
+        for (index, cat) in sortedCategories.enumerated() {
+            map[cat] = palette[index % palette.count]
+        }
+        return map
     }
 
     private func dayTotal(for date: Date) -> Double {
@@ -275,15 +298,27 @@ struct HistoryView: View {
                                                             }
                                                         }
                                                         
-                                                        if let note = item.note, !note.isEmpty {
-                                                            // Standard Note
-                                                            Text(note)
-                                                                .font(.system(size: 12, design: .monospaced))
-                                                                .foregroundColor(dynamicText.opacity(0.8))
-                                                                .padding(.horizontal, 6)
-                                                                .padding(.vertical, 2)
-                                                                .background(dynamicSecondary.opacity(0.2))
-                                                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                                        HStack(spacing: 6) {
+                                                            if let category = item.category, !category.isEmpty {
+                                                                let tagColor = categoryColorMap[category] ?? dynamicText
+                                                                Text(category.replacingOccurrences(of: "[^a-zA-Z0-9 ]", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces))
+                                                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                                    .foregroundColor(dynamicBackground)
+                                                                    .padding(.horizontal, 6)
+                                                                    .padding(.vertical, 2)
+                                                                    .background(tagColor)
+                                                                    .clipShape(Capsule())
+                                                            }
+                                                            if let note = item.note, !note.isEmpty {
+                                                                // Standard Note
+                                                                Text(note)
+                                                                    .font(.system(size: 12, design: .monospaced))
+                                                                    .foregroundColor(dynamicText.opacity(0.8))
+                                                                    .padding(.horizontal, 6)
+                                                                    .padding(.vertical, 2)
+                                                                    .background(dynamicSecondary.opacity(0.2))
+                                                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                                            }
                                                         }
                                                     }
                                                     Spacer()
@@ -489,6 +524,20 @@ struct HistoryView: View {
                     VStack {
                         Spacer()
                         HStack(spacing: 12) {
+                            Menu {
+                                ForEach(CategoryHelper.categories, id: \.self) { category in
+                                    Button(category) { tagCategoryOverride = category }
+                                }
+                            } label: {
+                                Text(tagCategoryOverride.split(separator: " ").first ?? "Category")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(dynamicText.opacity(0.1))
+                                    .clipShape(Capsule())
+                                    .foregroundColor(dynamicText)
+                            }
+                            
                             TextField("", text: $tagText, prompt: Text("add a note...").foregroundColor(dynamicSecondary))
                                 .font(.system(.body, design: .monospaced))
                                 .focused($isTagFocused)
@@ -763,6 +812,15 @@ struct HistoryView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 24) {
                         if !isSelectionMode {
+                            Button(action: {
+                                HapticManager.shared.softSquish()
+                                showStats = true
+                            }) {
+                                Image(systemName: "chart.pie.fill")
+                                    .font(.system(size: 20, weight: .bold))
+                            }
+                            .tint(dynamicText)
+
                             Button {
                                 withAnimation { isSelectionMode = true }
                             } label: {
@@ -783,6 +841,12 @@ struct HistoryView: View {
                 }
             }
             .toolbarColorScheme(isNightTime ? .dark : .light, for: .navigationBar)
+            .sheet(isPresented: $showStats) {
+                StatsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)
+                    .presentationBackground(.regularMaterial)
+                    .presentationCornerRadius(32)
+                    .preferredColorScheme(isNightTime ? .dark : .light)
+            }
             .sheet(isPresented: $showSearchDatePicker) {
                 VStack(spacing: 16) {
                     // Drag Indicator
@@ -1006,12 +1070,14 @@ struct HistoryView: View {
         HapticManager.shared.softSquish()
         taggingItem = item
         tagText = item.note ?? ""
+        tagCategoryOverride = item.category ?? "Other 📦" // Default to current category
         isTagFocused = true
     }
     
     private func saveTag() {
         if let item = taggingItem {
             item.note = tagText
+            item.category = tagCategoryOverride
 
             HapticManager.shared.success()
         }

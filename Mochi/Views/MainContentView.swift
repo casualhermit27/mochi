@@ -226,7 +226,7 @@ struct MainContentView: View {
                         .padding(.leading, 24)
                     
                     Spacer()
-                    
+                    .accessibilityIdentifier("stats_button")
 
                     // Settings Button
                     Button(action: {
@@ -728,6 +728,7 @@ struct MainContentView: View {
             timestamp: Date(),
             amount: amount,
             note: note,
+            category: CategoryHelper.categorize(note: note),
             paymentMethodId: methodId,
             currencyCode: settings.activeCurrencyCode
         )
@@ -789,6 +790,7 @@ struct MainContentView: View {
             timestamp: Date(),
             amount: amount,
             note: currentNote.isEmpty ? nil : currentNote,
+            category: CategoryHelper.categorize(note: currentNote.isEmpty ? nil : currentNote),
             paymentMethodId: methodId,
             currencyCode: settings.activeCurrencyCode
         )
@@ -865,6 +867,7 @@ struct MainContentView: View {
             timestamp: date,
             amount: amount,
             note: note,
+            category: CategoryHelper.categorize(note: note),
             paymentMethodId: methodId,
             currencyCode: currencyCode ?? settings.activeCurrencyCode
         )

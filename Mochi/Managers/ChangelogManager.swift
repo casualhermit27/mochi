@@ -27,9 +27,8 @@ class ChangelogManager: ObservableObject {
     
     // The current changelog to show for the latest version
     let currentChangelog: [ChangelogItem] = [
-        ChangelogItem(icon: "square.grid.2x2.fill", title: "Lavender Widget", description: "The purple theme now extends to your home screen widget. Set your theme to Lavender and your widget matches."),
-        ChangelogItem(icon: "checkmark.seal.fill", title: "Free Trial Fixed", description: "New users now correctly see the 3-day free trial offer. Everything is unlocked during your trial — no strings attached."),
-        ChangelogItem(icon: "wrench.and.screwdriver.fill", title: "Bug Fixes & Improvements", description: "Squashed several under-the-hood bugs and improved stability across the app.")
+        ChangelogItem(icon: "chart.line.uptrend.xyaxis", title: "New Insights Dashboard", description: "An Insights page has now been added, with an interactive visual flow chart that groups your categorized transactions mathematically."),
+        ChangelogItem(icon: "faceid", title: "Biometric Security", description: "Keep your money private. You can now lock Mochi behind FaceID or TouchID directly from the settings menu.")
     ]
     
     func checkVersion() {

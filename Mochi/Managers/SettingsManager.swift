@@ -59,6 +59,9 @@ class SettingsManager: ObservableObject {
         return diff
     }
     
+    // Privacy & Security
+    @AppStorage("biometricLockEnabled") var biometricLockEnabled: Bool = false
+    
     // Cloud Sync
     @AppStorage("iCloudSyncEnabled") var iCloudSyncEnabled: Bool = false
     @Published var lastSyncStatus: String? = nil // "synced", "no_data", or nil

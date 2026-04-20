@@ -7,8 +7,10 @@ import SwiftData
 @main
 struct MochiApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) var scenePhase
     @ObservedObject private var settings = SettingsManager.shared
     @ObservedObject private var notificationManager = NotificationManager.shared
+    @ObservedObject private var biometricManager = BiometricManager.shared
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -128,6 +130,12 @@ struct MochiApp: App {
                             withAnimation { settings.hideSyncToast() }
                         }
                     }
+                    
+                    if settings.biometricLockEnabled && !biometricManager.isAuthenticated {
+                        PrivacyLockView()
+                            .zIndex(1000)
+                            .transition(.opacity)
+                    }
                 }
                 .environment(\.locale, {
                     if settings.appLanguage == "system" {
@@ -151,6 +159,17 @@ struct MochiApp: App {
                     #endif
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: settings.showSyncToast)
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .background {
+                        if settings.biometricLockEnabled {
+                            biometricManager.isAuthenticated = false
+                        }
+                    } else if newPhase == .active {
+                        if settings.biometricLockEnabled && !biometricManager.isAuthenticated {
+                            biometricManager.authenticate()
+                        }
+                    }
+                }
 
         }
         .modelContainer(sharedModelContainer)
