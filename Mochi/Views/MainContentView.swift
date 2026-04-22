@@ -590,6 +590,7 @@ struct MainContentView: View {
             withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
                 breathingScale = 1.02
             }
+            runSmartCategoryBackfill()
             // Update widget data
             updateWidgetData()
             // Ensure notifications are up to date
@@ -606,6 +607,7 @@ struct MainContentView: View {
             } else {
                 updateWidgetData(includeLastTransaction: true)
             }
+            runSmartCategoryBackfill()
             
             // Update daily notification with new spend
             notificationManager.scheduleNotifications()
@@ -640,6 +642,7 @@ struct MainContentView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
+                runSmartCategoryBackfill()
                 // Update Widget
                 updateWidgetData()
                 
@@ -733,6 +736,7 @@ struct MainContentView: View {
             currencyCode: settings.activeCurrencyCode
         )
         modelContext.insert(newItem)
+        updateCategorySmartly(for: newItem, note: note)
         
         // Update Undo State
         lastAddedItem = newItem
@@ -785,16 +789,18 @@ struct MainContentView: View {
         
         HapticManager.shared.rigidImpact()
         
+        let note = currentNote.isEmpty ? nil : currentNote
         let methodId = settings.selectedPaymentMethod.id.uuidString
         let newItem = Item(
             timestamp: Date(),
             amount: amount,
-            note: currentNote.isEmpty ? nil : currentNote,
-            category: CategoryHelper.categorize(note: currentNote.isEmpty ? nil : currentNote),
+            note: note,
+            category: CategoryHelper.categorize(note: note),
             paymentMethodId: methodId,
             currencyCode: settings.activeCurrencyCode
         )
         modelContext.insert(newItem)
+        updateCategorySmartly(for: newItem, note: note)
         
         // Update Undo State
         lastAddedItem = newItem
@@ -872,6 +878,7 @@ struct MainContentView: View {
             currencyCode: currencyCode ?? settings.activeCurrencyCode
         )
         modelContext.insert(newItem)
+        updateCategorySmartly(for: newItem, note: note)
 
         lastAddedItem = newItem
         lastAddedTime = Date()
@@ -928,6 +935,19 @@ struct MainContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { 
                 withAnimation { showToast = false; showAddedAnimation = false } 
             }
+        }
+    }
+
+    private func runSmartCategoryBackfill() {
+        Task { @MainActor in
+            await CategoryHelper.backfillSmart(items: items)
+        }
+    }
+
+    private func updateCategorySmartly(for item: Item, note: String?) {
+        Task { @MainActor in
+            let category = await CategoryHelper.categorizeSmart(note: note)
+            item.category = category
         }
     }
 }

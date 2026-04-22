@@ -8,6 +8,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Mochi uses your camera to scan receipts so you can log purchases quickly.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Mochi uses Face ID to unlock your private spending history when privacy lock is enabled.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Mochi reads photos from your library so you can scan saved receipt images.</string>
 </dict>

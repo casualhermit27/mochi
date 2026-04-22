@@ -127,9 +127,13 @@ struct SankeyChartView: View {
                 // Tooltip Overlay for Hovering
                 if let hovered = hoveredItem {
                     VStack(spacing: 2) {
-                        Text(hovered.category)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundColor(dynamicText)
+                        HStack(spacing: 5) {
+                            Image(systemName: CategoryHelper.symbolName(for: hovered.category))
+                                .font(.system(size: 10, weight: .bold))
+                            Text(CategoryHelper.displayName(for: hovered.category))
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(dynamicText)
                         
                         Text("\(currencySymbol)\(String(format: "%.2f", hovered.amount))")
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
@@ -170,11 +174,7 @@ struct SankeyChartView: View {
                             
                             // Wide hit testing logic (approximate Y bounds of flow)
                             if value.location.y >= boundsY - 6 && value.location.y <= boundsY + nodeHeight + 6 {
-                                // Clean up the name by removing emojis specifically
-                                let cleanedString = item.category.replacingOccurrences(of: "[^a-zA-Z0-9 ]", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
-                                // If the cleaned string is empty from aggressive filtering, fallback
-                                let catName = cleanedString.isEmpty ? item.category : cleanedString
-                                foundData = HoverData(category: catName, amount: item.amount)
+                                foundData = HoverData(category: item.category, amount: item.amount)
                                 break
                             }
                         }

@@ -51,6 +51,7 @@ class SettingsManager: ObservableObject {
     // Onboarding
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @AppStorage("firstLaunchDate") var firstLaunchDate: Double = 0
+    @AppStorage("hasRunSemanticRecategorization") var hasRunSemanticRecategorization: Bool = false
     
     var daysSinceFirstUse: Int {
         if firstLaunchDate == 0 { return 0 }

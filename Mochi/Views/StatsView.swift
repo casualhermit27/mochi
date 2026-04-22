@@ -212,9 +212,13 @@ struct StatsView: View {
                                                         .fill(chartColors[index % chartColors.count])
                                                         .frame(width: 4, height: 16)
                                                     
-                                                    Text(categoryName)
-                                                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                                                        .foregroundColor(dynamicText)
+                                                    HStack(spacing: 8) {
+                                                        Image(systemName: CategoryHelper.symbolName(for: categoryName))
+                                                            .font(.system(size: 14, weight: .semibold))
+                                                        Text(CategoryHelper.displayName(for: categoryName))
+                                                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                    }
+                                                    .foregroundColor(dynamicText)
                                                     
                                                     Spacer()
                                                     
@@ -303,5 +307,10 @@ struct StatsView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            Task { @MainActor in
+                await CategoryHelper.backfillSmart(items: items)
+            }
+        }
     }
 }

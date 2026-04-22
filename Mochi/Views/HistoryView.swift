@@ -105,6 +105,7 @@ struct HistoryView: View {
         let amount: Double
         let timestamp: Date
         let note: String?
+        let category: String?
         let paymentMethodId: String?
         let currencyCode: String?
     }
@@ -285,32 +286,27 @@ struct HistoryView: View {
                                                         .clipShape(Circle())
                                                         .transition(.move(edge: .leading).combined(with: .opacity))
                                                 }
-                                                
+
                                                 HStack {
                                                     VStack(alignment: .leading, spacing: 4) {
                                                         HStack(spacing: 8) {
                                                             Text(item.timestamp, format: .dateTime.hour().minute())
                                                                 .foregroundColor(dynamicSecondary)
-                                                            
+
                                                             if let methodId = item.paymentMethodId,
                                                                let method = settings.getPaymentMethod(by: methodId) {
                                                                 CompactPaymentBadge(method: method, dynamicText: dynamicText)
                                                             }
                                                         }
-                                                        
+
                                                         HStack(spacing: 6) {
                                                             if let category = item.category, !category.isEmpty {
                                                                 let tagColor = categoryColorMap[category] ?? dynamicText
-                                                                Text(category.replacingOccurrences(of: "[^a-zA-Z0-9 ]", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces))
-                                                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                                                    .foregroundColor(dynamicBackground)
-                                                                    .padding(.horizontal, 6)
-                                                                    .padding(.vertical, 2)
-                                                                    .background(tagColor)
-                                                                    .clipShape(Capsule())
+                                                                Circle()
+                                                                    .fill(tagColor)
+                                                                    .frame(width: 8, height: 8)
                                                             }
                                                             if let note = item.note, !note.isEmpty {
-                                                                // Standard Note
                                                                 Text(note)
                                                                     .font(.system(size: 12, design: .monospaced))
                                                                     .foregroundColor(dynamicText.opacity(0.8))
@@ -491,8 +487,14 @@ struct HistoryView: View {
                             .listRowBackground(Color.clear)
                     }
                 }.onAppear {
-                    // Always expand ONLY Today when opening history
-                    // This ensures "new day" stuff shows up and "old day" collapses
+                    Task { @MainActor in
+                        if !settings.hasRunSemanticRecategorization {
+                            await CategoryHelper.recategorizeAll(items: items)
+                            settings.hasRunSemanticRecategorization = true
+                        } else {
+                            await CategoryHelper.backfillSmart(items: items)
+                        }
+                    }
                     let today = settings.getRitualDay(for: Date())
                     expandedDays = [today]
                 }
@@ -525,17 +527,25 @@ struct HistoryView: View {
                         Spacer()
                         HStack(spacing: 12) {
                             Menu {
-                                ForEach(CategoryHelper.categories, id: \.self) { category in
-                                    Button(category) { tagCategoryOverride = category }
+                                ForEach(CategoryHelper.definitions, id: \.id) { category in
+                                    Button {
+                                        tagCategoryOverride = category.legacyValue
+                                    } label: {
+                                        Label(category.name, systemImage: category.symbolName)
+                                    }
                                 }
                             } label: {
-                                Text(tagCategoryOverride.split(separator: " ").first ?? "Category")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(dynamicText.opacity(0.1))
-                                    .clipShape(Capsule())
-                                    .foregroundColor(dynamicText)
+                                HStack(spacing: 5) {
+                                    Image(systemName: CategoryHelper.symbolName(for: tagCategoryOverride))
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text(CategoryHelper.displayName(for: tagCategoryOverride))
+                                        .font(.system(.caption, design: .monospaced))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(dynamicText.opacity(0.1))
+                                .clipShape(Capsule())
+                                .foregroundColor(dynamicText)
                             }
                             
                             TextField("", text: $tagText, prompt: Text("add a note...").foregroundColor(dynamicSecondary))
@@ -1070,14 +1080,14 @@ struct HistoryView: View {
         HapticManager.shared.softSquish()
         taggingItem = item
         tagText = item.note ?? ""
-        tagCategoryOverride = item.category ?? "Other 📦" // Default to current category
+        tagCategoryOverride = CategoryHelper.storageValue(for: item.category)
         isTagFocused = true
     }
     
     private func saveTag() {
         if let item = taggingItem {
             item.note = tagText
-            item.category = tagCategoryOverride
+            item.category = CategoryHelper.storageValue(for: tagCategoryOverride)
 
             HapticManager.shared.success()
         }
@@ -1136,6 +1146,7 @@ struct HistoryView: View {
                     amount: item.amount, 
                     timestamp: item.timestamp, 
                     note: item.note,
+                    category: item.category,
                     paymentMethodId: item.paymentMethodId,
                     currencyCode: item.currencyCode
                 ))
@@ -1196,10 +1207,16 @@ struct HistoryView: View {
                 timestamp: snapshot.timestamp,
                 amount: snapshot.amount,
                 note: snapshot.note,
+                category: snapshot.category ?? CategoryHelper.categorize(note: snapshot.note),
                 paymentMethodId: snapshot.paymentMethodId,
                 currencyCode: snapshot.currencyCode
             )
             modelContext.insert(newItem)
+            if snapshot.category == nil {
+                Task { @MainActor in
+                    newItem.category = await CategoryHelper.categorizeSmart(note: snapshot.note)
+                }
+            }
             if snapshot.currencyCode == nil || snapshot.currencyCode == settings.activeCurrencyCode {
                 sessionDeletedAmount -= snapshot.amount
             }
