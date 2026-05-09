@@ -486,7 +486,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -497,11 +497,12 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -528,7 +529,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mochi/Mochi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -539,11 +540,12 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -569,7 +571,7 @@
 				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.casualhermit.MochiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -594,7 +596,7 @@
 				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 847R6X96S2;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.casualhermit.MochiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -629,7 +631,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -664,7 +666,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harsha.mochi.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

@@ -54,7 +54,7 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 dynamicBackground.ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Header
                     HStack {
@@ -62,9 +62,9 @@ struct SettingsView: View {
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(dynamicText)
                         Spacer()
-                        Button(action: { 
+                        Button(action: {
                             HapticManager.shared.softSquish()
-                            dismiss() 
+                            dismiss()
                         }) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .bold))
@@ -77,142 +77,112 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
-                    .padding(.bottom, 20)
-                    
+                    .padding(.bottom, 16)
+
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            // 0. Membership Status
-                            SettingsSection(icon: "sparkles", title: "MEMBERSHIP", textColor: dynamicText) {
-                                Button(action: {
-                                    HapticManager.shared.rigidImpact()
-                                    if subscription.isPro {
-                                        subscription.showCustomerCenter = true
-                                    } else {
-                                        subscription.showPaywall = true
+                        VStack(spacing: 20) {
+                            // Membership Card
+                            Button(action: {
+                                HapticManager.shared.rigidImpact()
+                                if subscription.isPro {
+                                    subscription.showCustomerCenter = true
+                                } else {
+                                    subscription.showPaywall = true
+                                }
+                            }) {
+                                MembershipCard()
+                            }
+                            .buttonStyle(.plain)
+
+                            // Group 1 — Personalise
+                            settingsCard {
+                                NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "moon.stars.fill", title: "Appearance")
+                                }
+                                rowDivider()
+                                NavigationLink(destination: LanguageSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
+                                    settingsRow(icon: "globe", title: "Language")
+                                }
+                                rowDivider()
+                                NavigationLink(destination: SecuritySettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor)) {
+                                    settingsRow(icon: "faceid", title: "Security")
+                                }
+                            }
+
+                            // Group 2 — Logging
+                            settingsCard {
+                                NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "pencil.line", title: "Logging")
+                                }
+                                rowDivider()
+                                NavigationLink(destination: SpeedDialSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
+                                    settingsRow(icon: "bolt.fill", title: "Speed Dial")
+                                }
+                                rowDivider()
+                                NavigationLink(destination: RecurringExpensesSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
+                                    settingsRow(icon: "repeat.circle.fill", title: "Recurring Expenses")
+                                }
+                            }
+
+                            // Group 3 — Data
+                            settingsCard {
+                                if subscription.isFullAccess {
+                                    NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                        settingsRow(icon: "square.and.arrow.up.fill", title: "Data & Export")
                                     }
-                                }) {
-                                    MembershipCard()
+                                } else {
+                                    Button(action: { HapticManager.shared.rigidImpact(); subscription.showPaywall = true }) {
+                                        settingsRow(icon: "square.and.arrow.up.fill", title: "Data & Export", locked: true)
+                                    }
                                 }
-                                .accessibilityIdentifier("membership_card")
-                                .buttonStyle(.plain)
+                                rowDivider()
+                                if subscription.isFullAccess {
+                                    NavigationLink(destination: CloudSyncSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                        settingsRow(icon: "icloud.fill", title: "Cloud Sync")
+                                    }
+                                } else {
+                                    Button(action: { HapticManager.shared.rigidImpact(); subscription.showPaywall = true }) {
+                                        settingsRow(icon: "icloud.fill", title: "Cloud Sync", locked: true)
+                                    }
+                                }
                             }
-                            .padding(.bottom, 8)
 
-                            // 1. Appearance
-                            NavigationLink(destination: AppearanceSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "moon.stars.fill", title: "Appearance", value: settings.themeMode == "amoled" ? "OLED" : settings.themeMode.capitalized, dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("appearance_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 1.5 Language
-                            NavigationLink(destination: LanguageSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
-                                MenuRow(icon: "globe", title: "Language", value: languageDisplayString(for: settings.appLanguage), dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("language_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 1.6 Security
-                            NavigationLink(destination: SecuritySettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor)) {
-                                MenuRow(icon: "faceid", title: "Security", value: settings.biometricLockEnabled ? "On" : "Off", dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("security_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 2. Logging
-                            NavigationLink(destination: LoggingSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "pencil.line", title: "Logging", value: settings.currencySymbol, dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("logging_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 2.1 Speed Dial
-                            NavigationLink(destination: SpeedDialSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground)) {
-                                MenuRow(icon: "bolt.fill", title: "Speed Dial", value: "", dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("speed_dial_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 2.1 Data & Export
-                            if subscription.isFullAccess {
-                                NavigationLink(destination: ExportDataView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                    MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
+                            // Group 4 — More
+                            settingsCard {
+                                NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "bell.fill", title: "Notifications")
                                 }
-                                .accessibilityIdentifier("export_row")
-                                .padding(.horizontal, 20)
-                            } else {
-                                Button(action: {
-                                    HapticManager.shared.rigidImpact()
-                                    subscription.showPaywall = true
-                                }) {
-                                    MenuRow(icon: "square.and.arrow.up.fill", title: "Data & Export", value: "CSV, PDF", dynamicText: dynamicText)
+                                rowDivider()
+                                NavigationLink(destination: FeedbackSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "waveform", title: "Feedback")
                                 }
-                                .padding(.horizontal, 20)
-                            }
-                            
-                            // 2.2 Cloud Sync
-                            if subscription.isFullAccess {
-                                NavigationLink(destination: CloudSyncSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                    MenuRow(icon: "icloud.fill", title: "Cloud Sync", value: settings.iCloudSyncEnabled ? "On" : "Off", dynamicText: dynamicText)
+                                rowDivider()
+                                NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "info.circle.fill", title: "About")
                                 }
-                                .accessibilityIdentifier("cloud_sync_row")
-                                .padding(.horizontal, 20)
-                            } else {
-                                Button(action: {
-                                    HapticManager.shared.rigidImpact()
-                                    subscription.showPaywall = true
-                                }) {
-                                    MenuRow(icon: "icloud.fill", title: "Cloud Sync", value: settings.iCloudSyncEnabled ? "On" : "Off", dynamicText: dynamicText)
+                                rowDivider()
+                                NavigationLink(destination: DebugControlsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
+                                    settingsRow(icon: "ant.fill", title: "Debug Controls")
                                 }
-                                .padding(.horizontal, 20)
                             }
-                            
-                            // 3. Notifications
-                            NavigationLink(destination: NotificationSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "bell.fill", title: "Notifications", value: settings.dailyNotificationEnabled ? "On" : "Off", dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("notifications_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 4. Feedback
-                            NavigationLink(destination: FeedbackSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "waveform", title: "Feedback", value: settings.hapticsEnabled ? "On" : "Off", dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("feedback_row")
-                            .padding(.horizontal, 20)
-                            
-                            // 5. About (Separated Rhythm)
-                            NavigationLink(destination: AboutSettingsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, accentColor: accentColor, isNightTime: isNightTime)) {
-                                MenuRow(
-                                    icon: "info.circle.fill",
-                                    title: "About",
-                                    value: "v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1")",
-                                    dynamicText: dynamicText
-                                )
-                            }
-                            .accessibilityIdentifier("about_row")
-                            .padding(.top, 16) // Extra rhythm separation
-                            .padding(.horizontal, 20)
 
-                            // 6. Debug Controls
-                            NavigationLink(destination: DebugControlsView(dynamicText: dynamicText, dynamicBackground: dynamicBackground, isNightTime: isNightTime)) {
-                                MenuRow(icon: "ant.fill", title: "Debug Controls", value: "", dynamicText: dynamicText)
-                            }
-                            .accessibilityIdentifier("debug_controls_row")
-                            .padding(.horizontal, 20)
-
-                            // Footer Anchor
-                            VStack(spacing: 4) {
-                                Text("Mochi")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundColor(dynamicText.opacity(0.15))
+                            // Footer
+                            VStack(spacing: 5) {
+                                Image("MochiLogo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 24, height: 24)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .opacity(0.35)
                                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1")")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                    .foregroundColor(dynamicText.opacity(0.1))
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundColor(dynamicText.opacity(0.2))
                             }
-                            .padding(.top, 32)
-                            .padding(.bottom, 24)
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 36)
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 4)
                     }
                 }
             }
@@ -236,29 +206,54 @@ struct SettingsView: View {
                 },
                 onViewHistory: {
                     notificationManager.activeReflection = nil
-                    // Trigger history on main screen
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         notificationManager.shouldOpenHistory = true
-                        dismiss() // Dismiss Settings to show History
+                        dismiss()
                     }
                 }
             )
         }
         .preferredColorScheme(isNightTime ? .dark : .light)
     }
-    
-    private func languageDisplayString(for code: String) -> String {
-        switch code {
-        case "en-AU": return "English (AU)"
-        case "en-GB": return "English (UK)"
-        case "en-CA": return "English (CA)"
-        case "ar": return "العربية"
-        case "es": return "Español"
-        case "ja": return "日本語"
-        case "zh-Hans": return "简体中文"
-        case "ko": return "한국어"
-        default: return "System"
+
+    @ViewBuilder
+    private func settingsCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
         }
+        .background(dynamicText.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func settingsRow(icon: String, title: String, locked: Bool = false) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(accentColor)
+                .frame(width: 22)
+            Text(LocalizedStringKey(title))
+                .font(.system(size: 16, weight: .regular, design: .rounded))
+                .foregroundColor(dynamicText)
+            Spacer()
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(dynamicText.opacity(0.2))
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(dynamicText.opacity(0.2))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 15)
+        .contentShape(Rectangle())
+    }
+
+    private func rowDivider() -> some View {
+        Divider()
+            .padding(.leading, 54)
+            .opacity(0.5)
     }
 }
 
@@ -932,70 +927,6 @@ struct NotificationSettingsView: View {
                             .background(dynamicText.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        
-                        SettingsSection(icon: "eye.fill", title: "PREVIEW", textColor: dynamicText) {
-                            HStack(spacing: 12) {
-                                // Daily Preview Card
-                                Button(action: {
-                                    HapticManager.shared.softSquish()
-                                    NotificationManager.shared.sendTestNotification(type: .daily)
-                                }) {
-                                    ZStack(alignment: .bottomLeading) {
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .fill(Color.mochiSage.opacity(isNightTime ? 0.1 : 0.2))
-                                        
-                                        VStack(alignment: .leading, spacing: 0) {
-                                            HStack {
-                                                Image("MochiLogo")
-                                                    .resizable()
-                                                    .frame(width: 28, height: 28)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                Spacer()
-                                                Image(systemName: "sun.max.fill")
-                                                    .font(.system(size: 14))
-                                                    .foregroundColor(dynamicText.opacity(0.3))
-                                            }
-                                            Spacer()
-                                            Text("DAILY")
-                                                .font(.system(size: 13, weight: .black, design: .monospaced))
-                                                .foregroundColor(dynamicText)
-                                        }
-                                        .padding(14)
-                                    }
-                                    .frame(height: 84)
-                                }
-                                
-                                // Weekly Preview Card
-                                Button(action: {
-                                    HapticManager.shared.softSquish()
-                                    NotificationManager.shared.sendTestNotification(type: .weekly)
-                                }) {
-                                    ZStack(alignment: .bottomLeading) {
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .fill(Color.mochiBlue.opacity(isNightTime ? 0.1 : 0.2))
-                                        
-                                        VStack(alignment: .leading, spacing: 0) {
-                                            HStack {
-                                                Image("MochiLogo")
-                                                    .resizable()
-                                                    .frame(width: 28, height: 28)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                Spacer()
-                                                Image(systemName: "calendar")
-                                                    .font(.system(size: 14))
-                                                    .foregroundColor(dynamicText.opacity(0.3))
-                                            }
-                                            Spacer()
-                                            Text("WEEKLY")
-                                                .font(.system(size: 13, weight: .black, design: .monospaced))
-                                                .foregroundColor(dynamicText)
-                                        }
-                                        .padding(14)
-                                    }
-                                    .frame(height: 84)
-                                }
-                            }
-                        }
                     }
                     .padding(.top, 12)
                 }
@@ -1298,14 +1229,47 @@ struct AboutSettingsView: View {
 
 struct MembershipCard: View {
     @ObservedObject var subscription = SubscriptionManager.shared
-    
+    @ObservedObject var settings = SettingsManager.shared
+    @Environment(\.colorScheme) var colorScheme
+
+    var isNightTime: Bool {
+        if settings.themeMode == "dark" || settings.themeMode == "amoled" { return true }
+        if settings.themeMode == "light" { return false }
+        if settings.themeMode == "auto" {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour < 6 || hour >= 20
+        }
+        return colorScheme == .dark
+    }
+
+    var cardBackground: Color {
+        if settings.colorTheme == "default" {
+            return isNightTime
+                ? Color(red: 0.98, green: 0.96, blue: 0.93)
+                : Color(red: 0.22, green: 0.20, blue: 0.18)
+        }
+        let theme = settings.currentPastelTheme
+        return isNightTime ? theme.background : theme.backgroundDark
+    }
+
+    var cardForeground: Color {
+        if settings.colorTheme == "default" {
+            return isNightTime
+                ? Color(red: 0.45, green: 0.35, blue: 0.28)
+                : Color(red: 0.92, green: 0.88, blue: 0.82)
+        }
+        let theme = settings.currentPastelTheme
+        return isNightTime ? theme.text : theme.textDark
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Image("MochiLogo")
                 .resizable()
+                .scaledToFit()
                 .frame(width: 40, height: 40)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(LocalizedStringKey(title))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -1318,10 +1282,10 @@ struct MembershipCard: View {
                 .font(.system(size: 14, weight: .semibold))
                 .opacity(0.3)
         }
-        .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.28))
         .padding(16)
-        .background(Color(red: 0.98, green: 0.96, blue: 0.93))
+        .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18))
+        .foregroundColor(cardForeground)
     }
     
     private var title: String {

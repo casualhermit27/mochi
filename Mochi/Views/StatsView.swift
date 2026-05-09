@@ -217,8 +217,11 @@ struct StatsView: View {
                                                             .font(.system(size: 14, weight: .semibold))
                                                         Text(CategoryHelper.displayName(for: categoryName))
                                                             .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                            .lineLimit(1)
+                                                            .fixedSize(horizontal: true, vertical: false)
                                                     }
                                                     .foregroundColor(dynamicText)
+                                                    .layoutPriority(1)
                                                     
                                                     Spacer()
                                                     
@@ -226,6 +229,8 @@ struct StatsView: View {
                                                     Text("\(settings.currencySymbol)\(String(format: "%.2f", data.amount)) (\(String(format: "%.0f", percentage))%)")
                                                         .font(.system(size: 16, weight: .medium, design: .monospaced))
                                                         .foregroundColor(dynamicText.opacity(0.6))
+                                                        .lineLimit(1)
+                                                        .minimumScaleFactor(0.8)
                                                         
                                                     Image(systemName: "chevron.right")
                                                         .font(.system(size: 12, weight: .bold))

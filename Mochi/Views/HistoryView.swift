@@ -12,11 +12,13 @@ struct HistoryView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var notificationManager = NotificationManager.shared
     @ObservedObject var subscription = SubscriptionManager.shared
+    @ObservedObject var cloudSync = CloudSyncManager.shared
     @Binding var sessionDeletedAmount: Double
     
     @State private var taggingItem: Item? = nil
     @State private var tagText: String = ""
     @State private var tagCategoryOverride: String = ""
+    @State private var originalTagCategory: String = ""
     @FocusState private var isTagFocused: Bool
     @State private var showRestoreToast = false
     @State private var showStats = false
@@ -83,7 +85,7 @@ struct HistoryView: View {
     @State private var showSearchDatePicker = false
     @State private var isSearchActive = false
     @FocusState private var isSearchFocused: Bool
-    @Namespace private var searchAnimation
+    private let searchTransition = Animation.spring(response: 0.42, dampingFraction: 0.88, blendDuration: 0.08)
     
     // Selection & Bulk Delete State
     @State private var isSelectionMode = false
@@ -306,6 +308,11 @@ struct HistoryView: View {
                                                                     .fill(tagColor)
                                                                     .frame(width: 8, height: 8)
                                                             }
+                                                            if isRecurringTransaction(item) {
+                                                                Image(systemName: "repeat.circle.fill")
+                                                                    .font(.system(size: 12))
+                                                                    .foregroundColor(.blue.opacity(0.7))
+                                                            }
                                                             if let note = item.note, !note.isEmpty {
                                                                 Text(note)
                                                                     .font(.system(size: 12, design: .monospaced))
@@ -481,10 +488,27 @@ struct HistoryView: View {
                     }
                     
                     if items.isEmpty {
-                        Text("No mochi yet.")
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(dynamicSecondary)
-                            .listRowBackground(Color.clear)
+                        if cloudSync.isRestoring {
+                            Text("iCloud restore in progress…")
+                                .font(.system(size: 12, weight: .regular, design: .rounded))
+                                .foregroundStyle(dynamicSecondary.opacity(0.7))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .padding(.bottom, 4)
+                            let shimmerWidths: [(CGFloat, CGFloat, CGFloat)] = [
+                                (44, 90, 52), (36, 110, 44), (50, 75, 56), (40, 120, 48), (44, 85, 52)
+                            ]
+                            ForEach(0..<5, id: \.self) { i in
+                                ShimmerHistoryRow(dynamicText: dynamicText, widths: shimmerWidths[i])
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                            }
+                        } else {
+                            Text("No mochi yet.")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(dynamicSecondary)
+                                .listRowBackground(Color.clear)
+                        }
                     }
                 }.onAppear {
                     Task { @MainActor in
@@ -501,6 +525,9 @@ struct HistoryView: View {
                 .scrollContentBackground(.hidden)
                 .background(dynamicBackground)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelectionMode)
+                .onChange(of: items.count) { _, count in
+                    if count > 0 { cloudSync.isRestoring = false }
+                }
                 .sheet(item: $editingDateItem) { item in
                     EditDateSheet(
                         dynamicText: dynamicText,
@@ -540,7 +567,9 @@ struct HistoryView: View {
                                         .font(.system(size: 11, weight: .bold))
                                     Text(CategoryHelper.displayName(for: tagCategoryOverride))
                                         .font(.system(.caption, design: .monospaced))
+                                        .lineLimit(1)
                                 }
+                                .frame(minWidth: 132, alignment: .leading)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
                                 .background(dynamicText.opacity(0.1))
@@ -641,56 +670,27 @@ struct HistoryView: View {
                         Spacer()
                         
                         if isSearchActive {
-                            // Expanded Search View
                             VStack(spacing: 12) {
-                                // Quick Filters Row
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
-                                        // Today
-                                        QuickFilterPill(
-                                            label: "Today",
-                                            isActive: isQuickFilter(.today),
-                                            accentColor: accentColor,
-                                            textColor: dynamicText,
-                                            secondaryColor: dynamicSecondary
-                                        ) {
-                                            applyQuickFilter(.today)
+                                        ForEach([
+                                            ("Today", QuickFilter.today),
+                                            ("This Week", QuickFilter.thisWeek),
+                                            ("Last 30 Days", QuickFilter.last30Days),
+                                            ("Last 2 Months", QuickFilter.last2Months)
+                                        ], id: \.0) { label, filter in
+                                            QuickFilterPill(
+                                                label: label,
+                                                isActive: isQuickFilter(filter),
+                                                accentColor: accentColor,
+                                                textColor: dynamicText,
+                                                secondaryColor: dynamicSecondary
+                                            ) {
+                                                applyQuickFilter(filter)
+                                            }
+                                            .transition(.scale(scale: 0.8).combined(with: .opacity))
                                         }
-                                        
-                                        // This Week
-                                        QuickFilterPill(
-                                            label: "This Week",
-                                            isActive: isQuickFilter(.thisWeek),
-                                            accentColor: accentColor,
-                                            textColor: dynamicText,
-                                            secondaryColor: dynamicSecondary
-                                        ) {
-                                            applyQuickFilter(.thisWeek)
-                                        }
-                                        
-                                        // Last 30 Days
-                                        QuickFilterPill(
-                                            label: "Last 30 Days",
-                                            isActive: isQuickFilter(.last30Days),
-                                            accentColor: accentColor,
-                                            textColor: dynamicText,
-                                            secondaryColor: dynamicSecondary
-                                        ) {
-                                            applyQuickFilter(.last30Days)
-                                        }
-                                        
-                                        // Last 2 Months
-                                        QuickFilterPill(
-                                            label: "Last 2 Months",
-                                            isActive: isQuickFilter(.last2Months),
-                                            accentColor: accentColor,
-                                            textColor: dynamicText,
-                                            secondaryColor: dynamicSecondary
-                                        ) {
-                                            applyQuickFilter(.last2Months)
-                                        }
-                                        
-                                        // Custom Date Range
+
                                         Button(action: { showSearchDatePicker = true }) {
                                             HStack(spacing: 6) {
                                                 Image(systemName: "calendar")
@@ -711,37 +711,31 @@ struct HistoryView: View {
                                             .foregroundColor(hasDateFilter ? accentColor : dynamicSecondary)
                                             .clipShape(Capsule())
                                         }
+                                        .transition(.scale(scale: 0.8).combined(with: .opacity))
                                     }
                                 }
                                 
-                                // Search Input + Close
                                 HStack(spacing: 12) {
                                     Image(systemName: "magnifyingglass")
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(dynamicSecondary)
-                                    
+                                        .transition(.scale.combined(with: .opacity))
+
                                     TextField("", text: $searchText, prompt: Text("Search notes, amount, tag...").foregroundColor(dynamicSecondary.opacity(0.6)))
                                         .font(.system(size: 16, design: .monospaced))
                                         .foregroundColor(dynamicText)
                                         .focused($isSearchFocused)
-                                    
+
                                     if !searchText.isEmpty {
                                         Button(action: { searchText = "" }) {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.system(size: 16))
                                                 .foregroundColor(dynamicSecondary)
                                         }
+                                        .transition(.scale(scale: 0.8).combined(with: .opacity))
                                     }
-                                    
-                                    // Close Search
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
-                                            isSearchActive = false
-                                            isSearchFocused = false
-                                            searchText = ""
-                                            clearDateFilter()
-                                        }
-                                    }) {
+
+                                    Button(action: closeSearch) {
                                         Image(systemName: "xmark")
                                             .font(.system(size: 12, weight: .bold))
                                             .foregroundColor(dynamicSecondary)
@@ -749,64 +743,93 @@ struct HistoryView: View {
                                             .background(dynamicText.opacity(0.08))
                                             .clipShape(Circle())
                                     }
+                                    .transition(.scale.combined(with: .opacity))
                                 }
                                 .padding(.vertical, 12)
                                 .padding(.horizontal, 16)
-                                .background(dynamicText.opacity(0.06))
+                                .background(dynamicText.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .transition(.scale(scale: 0.95).combined(with: .opacity))
                             }
                             .padding(16)
                             .background(
                                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                                     .fill(dynamicBackground.opacity(0.95))
-                                    .shadow(color: dynamicText.opacity(isNightTime ? 0.15 : 0.08), radius: 20, y: -5)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                                     .stroke(dynamicText.opacity(0.06), lineWidth: 1)
                             )
-                            .matchedGeometryEffect(id: "searchContainer", in: searchAnimation)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.85).combined(with: .opacity)
+                            ))
                         } else {
-                            // Collapsed Search Button
-                            Button(action: {
-                                withAnimation(.spring(response: 0.55, dampingFraction: 0.85, blendDuration: 0.1)) {
-                                    isSearchActive = true
+                            HStack(spacing: 10) {
+                                Button(action: {
+                                    HapticManager.shared.softSquish()
+                                    showStats = true
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "chart.pie.fill")
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text("Insights")
+                                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                    }
+                                    .foregroundColor(dynamicSecondary)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 18)
+                                    .background(
+                                        Capsule()
+                                            .fill(dynamicBackground.opacity(0.95))
+                                            .shadow(color: dynamicText.opacity(isNightTime ? 0.0 : 0.06), radius: 10, y: 2)
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(dynamicText.opacity(0.06), lineWidth: 1)
+                                    )
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                    isSearchFocused = true
+
+                                Button(action: openSearch) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "magnifyingglass")
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text("Search")
+                                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                    }
+                                    .foregroundColor(dynamicSecondary)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 20)
+                                    .background(
+                                        Capsule()
+                                            .fill(dynamicBackground.opacity(0.95))
+                                            .shadow(color: dynamicText.opacity(isNightTime ? 0.0 : 0.06), radius: 10, y: 2)
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(dynamicText.opacity(0.06), lineWidth: 1)
+                                    )
                                 }
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "magnifyingglass")
-                                        .font(.system(size: 14, weight: .medium))
-                                    Text("Search")
-                                        .font(.system(size: 14, weight: .medium, design: .monospaced))
-                                }
-                                .foregroundColor(dynamicSecondary)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 20)
-                                .background(
-                                    Capsule()
-                                        .fill(dynamicBackground.opacity(0.95))
-                                        .shadow(color: dynamicText.opacity(isNightTime ? 0.1 : 0.06), radius: 10, y: 2)
-                                        .matchedGeometryEffect(id: "searchContainer", in: searchAnimation)
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(dynamicText.opacity(0.06), lineWidth: 1)
-                                )
                             }
                             .padding(.bottom, 16)
+                            .opacity(isSearchActive ? 0 : 1)
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
                         }
                     }
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1), value: isSearchActive)
                     .zIndex(103)
                 }
             }
-            .navigationTitle("Mochi")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("History")
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .foregroundStyle(dynamicSecondary)
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     if isSelectionMode {
                         Button("Cancel") {
@@ -820,31 +843,23 @@ struct HistoryView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 24) {
+                    HStack(spacing: 16) {
                         if !isSelectionMode {
-                            Button(action: {
-                                HapticManager.shared.softSquish()
-                                showStats = true
-                            }) {
-                                Image(systemName: "chart.pie.fill")
-                                    .font(.system(size: 20, weight: .bold))
-                            }
-                            .tint(dynamicText)
-
                             Button {
                                 withAnimation { isSelectionMode = true }
                             } label: {
-                                Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 20, weight: .medium))
+                                Image(systemName: "trash")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
-                            .tint(dynamicText)
+                            .tint(swipeDeleteColor)
                         }
-                        
-                        Button {
-                            dismiss()
-                        } label: {
+                        Button { dismiss() } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
                         }
                         .tint(dynamicText)
                     }
@@ -966,6 +981,44 @@ struct HistoryView: View {
         searchStartDate = nil
         searchEndDate = nil
     }
+
+    private func openSearch() {
+        HapticManager.shared.lightImpact()
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1)) {
+            isSearchActive = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            guard isSearchActive else { return }
+            HapticManager.shared.lightImpact()
+            isSearchFocused = true
+        }
+    }
+
+    private func closeSearch() {
+        HapticManager.shared.lightImpact()
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        isSearchFocused = false
+
+        let snapBack = Animation.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.08)
+        var transaction = Transaction(animation: snapBack)
+        transaction.disablesAnimations = false
+
+        let hadQuery = !searchText.isEmpty || hasDateFilter
+        if hadQuery {
+            withTransaction(transaction) {
+                searchText = ""
+                clearDateFilter()
+            }
+        }
+
+        withAnimation(snapBack) {
+            isSearchActive = false
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            HapticManager.shared.lightImpact()
+        }
+    }
     
     private func applyQuickFilter(_ filter: QuickFilter) {
         HapticManager.shared.lightImpact()
@@ -1081,13 +1134,18 @@ struct HistoryView: View {
         taggingItem = item
         tagText = item.note ?? ""
         tagCategoryOverride = CategoryHelper.storageValue(for: item.category)
+        originalTagCategory = CategoryHelper.storageValue(for: item.category)
         isTagFocused = true
     }
     
     private func saveTag() {
         if let item = taggingItem {
             item.note = tagText
-            item.category = CategoryHelper.storageValue(for: tagCategoryOverride)
+            let selectedCategory = CategoryHelper.storageValue(for: tagCategoryOverride)
+            item.category = selectedCategory
+            if selectedCategory != originalTagCategory {
+                item.isCategoryUserEdited = true
+            }
 
             HapticManager.shared.success()
         }
@@ -1226,6 +1284,15 @@ struct HistoryView: View {
         withAnimation { showUndoToast = false }
     }
     
+    private func isRecurringTransaction(_ item: Item) -> Bool {
+        let recurring = settings.recurringTransactions.filter { $0.isActive }
+        return recurring.contains { r in
+            (r.note == item.note || item.note?.contains(r.note ?? "") ?? false) &&
+            r.amount == item.amount &&
+            r.category == item.category
+        }
+    }
+
     private func moveItem(_ item: Item, to day: Date) {
         let calendar = Calendar.current
         let time = calendar.dateComponents([.hour, .minute, .second], from: item.timestamp)
@@ -1392,6 +1459,45 @@ struct QuickFilterPill: View {
                 .background(isActive ? accentColor.opacity(0.2) : textColor.opacity(0.08))
                 .foregroundColor(isActive ? accentColor : secondaryColor)
                 .clipShape(Capsule())
+        }
+    }
+}
+
+// MARK: - Shimmer Loading Row
+
+struct ShimmerHistoryRow: View {
+    let dynamicText: Color
+    let widths: (CGFloat, CGFloat, CGFloat)
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        HStack {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .frame(width: widths.0, height: 10)
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .frame(width: widths.1, height: 10)
+            Spacer()
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .frame(width: widths.2, height: 10)
+        }
+        .foregroundColor(dynamicText.opacity(0.07))
+        .overlay(
+            GeometryReader { geo in
+                LinearGradient(
+                    colors: [.clear, dynamicText.opacity(0.1), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: geo.size.width * 0.35)
+                .offset(x: phase * (geo.size.width + geo.size.width * 0.35))
+            }
+            .clipped()
+        )
+        .padding(.vertical, 6)
+        .onAppear {
+            withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
+                phase = 1
+            }
         }
     }
 }

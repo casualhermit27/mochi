@@ -64,6 +64,10 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
                 self.triggerReflection(type: .daily)
             case "weekly_summary":
                 self.triggerReflection(type: .weekly)
+            case "recurring_reminder":
+                if let recurringId = userInfo["recurringId"] as? String {
+                    NotificationCenter.default.post(name: NSNotification.Name("RecurringReminderTapped"), object: recurringId)
+                }
             default:
                 break
             }
@@ -141,8 +145,36 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
     
+    // MARK: - Recurring Reminders
+
+    @MainActor
+    func scheduleRecurringReminder(transaction: RecurringTransaction) {
+        let center = UNUserNotificationCenter.current()
+
+        let content = UNMutableNotificationContent()
+        content.title = "Reminder: \(transaction.note ?? transaction.category)"
+        content.body = "Spend \(SettingsManager.shared.currencySymbol)\(formatAmount(transaction.amount)) for \(transaction.category)?"
+        content.sound = .default
+        content.userInfo = ["type": "recurring_reminder", "recurringId": transaction.id.uuidString]
+
+        var components = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: transaction.nextDueDate)
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: "recurring_\(transaction.id.uuidString)", content: content, trigger: trigger)
+
+        center.add(request) { error in
+            #if DEBUG
+            if let error { print("Error scheduling recurring: \(error)") }
+            #endif
+        }
+    }
+
+    func cancelRecurringReminder(recurringId: UUID) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["recurring_\(recurringId.uuidString)"])
+    }
+
     // MARK: - Test Notification
-    
+
     func sendTestNotification(type: ReflectionData.ReflectionType) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {

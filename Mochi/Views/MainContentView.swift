@@ -58,6 +58,13 @@ struct MainContentView: View {
     @State private var scanErrorMessage = ""
     @State private var isLaunchingReceiptFlow = false
     @State private var scanButtonPop = false
+
+    // Recurring Transactions
+    @State private var showRecurringSheet = false
+    @State private var pendingRecurringAmount: Double = 0
+    @State private var pendingRecurringNote: String = ""
+    @State private var pendingRecurringCategory: String = ""
+    @State private var pendingRecurringMethodId: String? = nil
     
 
     
@@ -546,6 +553,18 @@ struct MainContentView: View {
                 .preferredColorScheme(isNightTime ? .dark : .light)
             }
         }
+        .sheet(isPresented: $showRecurringSheet) {
+            RecurringSetupSheet(
+                isPresented: $showRecurringSheet,
+                amount: pendingRecurringAmount,
+                note: pendingRecurringNote,
+                category: pendingRecurringCategory,
+                paymentMethodId: pendingRecurringMethodId,
+                onConfirm: saveRecurring
+            )
+            .presentationCornerRadius(32)
+            .presentationBackground(dynamicBackground)
+        }
         .alert("Couldn't Read Receipt", isPresented: $showScanError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -725,7 +744,7 @@ struct MainContentView: View {
     
     private func instantAdd(amount: Double, note: String, paymentMethodId: String? = nil) {
         HapticManager.shared.rigidImpact()
-        
+
         let methodId = paymentMethodId ?? settings.selectedPaymentMethod.id.uuidString
         let newItem = Item(
             timestamp: Date(),
@@ -737,11 +756,20 @@ struct MainContentView: View {
         )
         modelContext.insert(newItem)
         updateCategorySmartly(for: newItem, note: note)
-        
+
+        // Check for recurring pattern
+        if let frequency = RecurringDetector.detectRecurring(note: note, category: newItem.category ?? "", amount: amount, history: items) {
+            pendingRecurringAmount = amount
+            pendingRecurringNote = note
+            pendingRecurringCategory = newItem.category ?? ""
+            pendingRecurringMethodId = methodId
+            showRecurringSheet = true
+        }
+
         // Update Undo State
         lastAddedItem = newItem
         lastAddedTime = Date()
-        
+
         // Show Animation
         addedAmount = amount
         isNegativeDelta = false
@@ -777,7 +805,7 @@ struct MainContentView: View {
             // Error Wiggle
             HapticManager.shared.softSquish() // Error haptic (double tap feels like error)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { HapticManager.shared.softSquish() }
-            
+
             withAnimation(.default) {
                 wiggleOffset = 10
             }
@@ -786,9 +814,9 @@ struct MainContentView: View {
             }
             return
         }
-        
+
         HapticManager.shared.rigidImpact()
-        
+
         let note = currentNote.isEmpty ? nil : currentNote
         let methodId = settings.selectedPaymentMethod.id.uuidString
         let newItem = Item(
@@ -801,11 +829,20 @@ struct MainContentView: View {
         )
         modelContext.insert(newItem)
         updateCategorySmartly(for: newItem, note: note)
-        
+
+        // Check for recurring pattern
+        if let frequency = RecurringDetector.detectRecurring(note: note ?? "", category: newItem.category ?? "", amount: amount, history: items) {
+            pendingRecurringAmount = amount
+            pendingRecurringNote = note ?? ""
+            pendingRecurringCategory = newItem.category ?? ""
+            pendingRecurringMethodId = methodId
+            showRecurringSheet = true
+        }
+
         // Update Undo State
         lastAddedItem = newItem
         lastAddedTime = Date()
-        
+
         // Show Animation
         addedAmount = amount
         isNegativeDelta = false
@@ -837,6 +874,13 @@ struct MainContentView: View {
         }
     }
     
+    private func saveRecurring(_ recurring: RecurringTransaction) {
+        var all = settings.recurringTransactions
+        all.append(recurring)
+        settings.recurringTransactions = all
+        notificationManager.scheduleRecurringReminder(transaction: recurring)
+    }
+
     // MARK: - Receipt Scanning
 
     private func processScannedImage(_ image: UIImage) {

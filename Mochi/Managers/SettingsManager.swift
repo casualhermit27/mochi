@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import SwiftData
 
 class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
@@ -68,6 +69,22 @@ class SettingsManager: ObservableObject {
     @Published var lastSyncStatus: String? = nil // "synced", "no_data", or nil
     @Published var showSyncToast: Bool = false
     
+    // MARK: - Recurring Transactions
+    @AppStorage("recurringTransactionsData") var recurringTransactionsData: Data = Data()
+
+    var recurringTransactions: [RecurringTransaction] {
+        get {
+            guard !recurringTransactionsData.isEmpty else { return [] }
+            return (try? JSONDecoder().decode([RecurringTransaction].self, from: recurringTransactionsData)) ?? []
+        }
+        set {
+            if let encoded = try? JSONEncoder().encode(newValue) {
+                recurringTransactionsData = encoded
+                objectWillChange.send()
+            }
+        }
+    }
+
     // MARK: - Speed Dial
     @AppStorage("speedDialPresetsData") var speedDialPresetsData: Data = Data()
     
@@ -413,9 +430,11 @@ class SettingsManager: ObservableObject {
 
 // MARK: - AppStorage Cloud Syncer
 
-class CloudSyncManager: NSObject {
+class CloudSyncManager: NSObject, ObservableObject {
     static let shared = CloudSyncManager()
-    
+
+    @Published var isRestoring: Bool = false
+
     private let syncedKeys = [
         "themeMode", "appLanguage", "colorTheme", "customCurrencyCode", "widgetMatchTheme",
         "dayStartHour", "dayStartMinute", 
@@ -468,9 +487,10 @@ class CloudSyncManager: NSObject {
     
     @discardableResult
     func forceRestore() -> Bool {
-        // Trigger implicit sync to grab latest data from Apple
+        DispatchQueue.main.async { self.isRestoring = true }
+
         store.synchronize()
-        
+
         isProcessingRemoteChanges = true
         var needsRefresh = false
         var hasDataInCloud = false
@@ -485,13 +505,17 @@ class CloudSyncManager: NSObject {
             }
             localCache[key] = defaults.object(forKey: key)
         }
-        
+
         if needsRefresh {
             DispatchQueue.main.async {
                 SettingsManager.shared.objectWillChange.send()
             }
         }
         isProcessingRemoteChanges = false
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
+            self.isRestoring = false
+        }
         return hasDataInCloud
     }
     

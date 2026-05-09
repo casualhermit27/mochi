@@ -314,11 +314,16 @@ enum CategoryHelper {
         return !isKnown || resolved.id == otherCategory.id
     }
 
+    static func shouldRecategorize(_ item: Item) -> Bool {
+        guard !item.isCategoryUserEdited else { return false }
+        return shouldRecategorize(category: item.category, note: item.note)
+    }
+
     @discardableResult
     static func backfill(items: [Item]) -> Int {
         var updatedCount = 0
 
-        for item in items where shouldRecategorize(category: item.category, note: item.note) {
+        for item in items where shouldRecategorize(item) {
             let match = categorizeDetails(note: item.note)
             guard match.category.id != otherCategory.id else { continue }
 
@@ -334,7 +339,7 @@ enum CategoryHelper {
     static func backfillSmart(items: [Item]) async -> Int {
         var updatedCount = 0
 
-        for item in items where shouldRecategorize(category: item.category, note: item.note) {
+        for item in items where shouldRecategorize(item) {
             let match = await categorizeSmartDetails(note: item.note)
             guard match.category.id != otherCategory.id else { continue }
 

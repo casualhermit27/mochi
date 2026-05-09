@@ -60,34 +60,31 @@ struct SankeyChartView: View {
             let safeTotal = totalSpent == 0 ? 1.0 : totalSpent
             
             let totalHeight = geo.size.height
-            let spacing: CGFloat = 8 // Small spacing for minimalist look
+            let spacing: CGFloat = 8
             let totalSpacing = spacing * CGFloat(max(0, safeData.count - 1))
             let availableHeight = max(0, totalHeight - totalSpacing)
+            let horizontalInset: CGFloat = 6
             
-            // MATH FOR MINIMUM HEIGHTS:
-            // Ensure even tiny $2 purchases are visually rendered on screen
+            // Ensure even tiny purchases are still visible.
             let desiredMinHeight: CGFloat = 8.0
             let actualMinHeight = min(desiredMinHeight, availableHeight / CGFloat(safeData.count))
             let totalMinHeights = actualMinHeight * CGFloat(safeData.count)
             let distributableHeight = max(0, availableHeight - totalMinHeights)
             
             let baseLeftColor = dynamicText.opacity(0.8)
+            let nodeWidth: CGFloat = 5
+            let nodeCornerRadius: CGFloat = 1.5
             
             ZStack(alignment: .topLeading) {
-                // Left solid continuous bar
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: nodeCornerRadius, style: .continuous)
                     .fill(baseLeftColor)
-                    .frame(width: 8, height: availableHeight)
+                    .frame(width: nodeWidth, height: availableHeight)
                     .offset(x: 0, y: totalSpacing / 2) 
                 
-                // Draw Links and Right Bars
                 ForEach(Array(safeData.enumerated()), id: \.element.category) { index, item in
-                    
-                    // Proportion of the dynamically distributable height
                     let dynamicHeight = CGFloat(item.amount / safeTotal) * distributableHeight
                     let nodeHeight = dynamicHeight + actualMinHeight
                     
-                    // Accumulate heights of all previous nodes to find start Y
                     let previousNodesHeight = safeData.prefix(index).reduce(0) { sum, prevItem in
                         sum + (CGFloat(prevItem.amount / safeTotal) * distributableHeight) + actualMinHeight
                     }
@@ -97,7 +94,6 @@ struct SankeyChartView: View {
                     
                     let itemColor = colors[index % colors.count]
                     
-                    // The Flow
                     SankeyLinkShape(startY: startYForThis, startHeight: nodeHeight, endY: endYForThis, endHeight: nodeHeight)
                         .fill(
                             LinearGradient(
@@ -106,15 +102,13 @@ struct SankeyChartView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .padding(.horizontal, 10) 
+                        .padding(.horizontal, horizontalInset)
                     
-                    // The Right Bar
-                    Capsule(style: .continuous)
+                    RoundedRectangle(cornerRadius: nodeCornerRadius, style: .continuous)
                         .fill(itemColor)
-                        .frame(width: 8, height: nodeHeight)
-                        .offset(x: geo.size.width - 8, y: endYForThis)
-                        
-                    // Percentage label instead of emojis
+                        .frame(width: nodeWidth, height: nodeHeight)
+                        .offset(x: geo.size.width - nodeWidth, y: endYForThis)
+
                     let percentage = (item.amount / safeTotal) * 100
                     if percentage >= 1.0 && nodeHeight >= 12 {
                         Text("\(String(format: "%.0f", percentage))%")
@@ -124,7 +118,6 @@ struct SankeyChartView: View {
                     }
                 }
                 
-                // Tooltip Overlay for Hovering
                 if let hovered = hoveredItem {
                     VStack(spacing: 2) {
                         HStack(spacing: 5) {
@@ -146,13 +139,11 @@ struct SankeyChartView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(dynamicText.opacity(0.1), lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.1), radius: 5, y: 3)
-                        // Dynamic positioning near finger
                         .position(x: hoverLocation.x, y: hoverLocation.y - 32)
                         .animation(.interpolatingSpring(stiffness: 300, damping: 20), value: hoverLocation)
                 }
             }
             .contentShape(Rectangle())
-            // The Hover / Touch interaction
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
